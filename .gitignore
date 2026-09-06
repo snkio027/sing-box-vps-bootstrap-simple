@@ -1,0 +1,18 @@
+# Runtime and local evidence
+/.work/
+/artifacts/
+/reports/
+*.log
+*.tmp
+__pycache__/
+*.py[cod]
+
+# Secret-bearing material
+/secret
+/vps-conn.sh
+*.client.json
+*.secret
+*.key
+
+# Archives generated outside the source tree
+*.zip

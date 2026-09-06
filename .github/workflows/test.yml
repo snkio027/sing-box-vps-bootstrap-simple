@@ -1,0 +1,48 @@
+name: Bash installer
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: for script in scripts/*.sh tests/*.sh; do bash -n "$script"; done
+      - run: shellcheck -x scripts/*.sh tests/*.sh
+      - run: sudo bash tests/unit.sh
+      - run: bash tests/client-unit.sh
+  mac-client:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: brew update && brew install --formula bash curl jq openssl sing-box && brew upgrade --formula --no-ask bash curl jq openssl sing-box
+      - run: /opt/homebrew/bin/bash -n scripts/connect-vps.sh
+      - run: /opt/homebrew/bin/bash tests/client-unit.sh
+  vm:
+    needs: static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install test-only virtualization tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils
+      - name: Install and test SS2022 in a disposable 1 GiB / 20 GiB VM
+        run: sudo python3 -B tests/run_vm.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: simple-vm-result
+          path: artifacts/simple-vm/
+          if-no-files-found: warn
+          retention-days: 14

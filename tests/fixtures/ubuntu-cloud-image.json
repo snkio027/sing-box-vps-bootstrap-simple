@@ -1,0 +1,9 @@
+{
+  "schema": "prepare-vps.test-image/v1",
+  "purpose": "DISPOSABLE_TEST_VM_ONLY",
+  "release": "Ubuntu 24.04 LTS / 20260826 / amd64",
+  "url": "https://cloud-images.ubuntu.com/releases/noble/release-20260826/ubuntu-24.04-server-cloudimg-amd64.img",
+  "sha256": "d0fe84bb5f80853425fa6be28e2c106f30104c3cfe8611933f2e65c9b63f0e30",
+  "size_bytes": 624829952,
+  "checksum_source": "https://cloud-images.ubuntu.com/releases/noble/release-20260826/SHA256SUMS"
+}
