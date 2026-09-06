@@ -32,7 +32,8 @@
       {
         "type": "local",
         "tag": "dns-local",
-        "prefer_go": false
+        "prefer_go": false,
+        "bind_interface": "en4"
       },
       {
         "type": "fakeip",

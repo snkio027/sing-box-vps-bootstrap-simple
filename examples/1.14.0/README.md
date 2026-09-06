@@ -24,10 +24,15 @@
 1. **本地出站不绑网卡。** `local-direct` 不设置 `bind_interface`，全局也不设置
    `default_interface` 或启用 `auto_detect_interface`。本机、私有地址和本地域名依赖系统已有
    lo0、桥接或 VPN 路由；VPS、普通公网 direct 和国内 DoH 继续绑定 `en4`。
-2. **本地域名复用系统解析。** 单一 `dns-local` 使用 `type=local`、`prefer_go=false`，
-   不绑接口。删除公网地址充当局域网 DNS 的设置，以及仅在 en4 查询 `.local` 的 mDNS 设置。
-   `.local`（包含 OrbStack 的 `*.orb.local`）、`.lan`、`.home.arpa` 和单标签名称优先使用本地解析。
-   这依赖系统本身已有正确记录，不会自动创建内网域名或启动容器环境。
+2. **本地域名读取系统解析配置，上游连接绑定 en4。** `dns-local` 保留 `type=local`、
+   `prefer_go=false`，新增 `bind_interface=en4`。1.14.0 可自行向系统 DNS 上游发出查询，
+   `prefer_go=false` 不保证每次由 macOS 代发；绑定物理接口避免这些上游连接依赖 TUN 默认路由，
+   再次命中 `hijack-dns`。本地业务出站 `local-direct` 仍不绑定，两者分别处理。
+   `.local`（包含 OrbStack 的 `*.orb.local`）、`.lan`、`.home.arpa` 和单标签名称优先使用此解析器；
+   这不会创建内网记录，也不保证 OrbStack 的特殊域名机制已兼容。
+   **使用前提：实际系统 DNS 上游经 en4 可达。** 若上游只在 lo0、容器桥或其他 VPN 可达，
+   或切换后系统 DNS 指向 TUN 自身，应先调整并验证上游路径，不能继续套用此绑定。
+   系统只配置公网 DNS 时，本地域仍可能没有记录；不再另设公网地址作为通用局域网 DNS。
 3. **GeoIP 仅补充已有真实 IP。** `geosite-cn` 和 `geoip-cn` 分开列出。默认 rule 模式下，
    国内域名列表直连，其余域名走 VPS；没有为 FakeIP 域名增加 `resolve`，不能把 GeoIP
    描述为这些域名的“解析后国内 IP 兜底”。
@@ -37,6 +42,7 @@
 依据：[1.14.0 接口绑定实现](https://github.com/SagerNet/sing-box/blob/v1.14.0/common/dialer/default.go)、
 [Local DNS](https://github.com/SagerNet/sing-box/blob/v1.14.0/docs/configuration/dns/server/local.md)、
 [本地解析实现](https://github.com/SagerNet/sing-box/blob/v1.14.0/dns/transport/local/local.go)、
+[系统 DNS 上游连接实现](https://github.com/SagerNet/sing-box/blob/v1.14.0/dns/transport/local/local_shared.go)、
 [FakeIP 与路由](https://github.com/SagerNet/sing-box/blob/v1.14.0/route/route.go)、
 [OrbStack 域名](https://docs.orbstack.dev/docker/domains)、
 [home.arpa](https://www.rfc-editor.org/rfc/rfc8375.html#section-3)。
@@ -72,7 +78,8 @@ API 切换 global/direct 时仍保留前置的本地、公网 IPv6 和广告策�
 
 依据：[1.14.0 initial_path / HTTP client](https://github.com/SagerNet/sing-box/blob/v1.14.0/docs/configuration/rule-set/index.md)。
 
-真正替换现用代理时，还需完成原配置/启动项备份，核对现有应用端口、系统代理和 PAC/WPAD，
+真正替换现用代理时，还需完成原配置/启动项备份，核对系统 DNS 上游经 en4 的可达性、
+现有应用端口、系统代理和 PAC/WPAD，
 处理入口兼容性，验证完整 TUN 接管与退出恢复，最后验证新启动项持久运行。
 不能只替换 JSON 就声称日常流量已经切换。不要同时运行两套 auto_route TUN。
 本轮没有修改安装器或 `connect-vps.sh`；后者仍只生成它自己的最小 SOCKS 配置，不加载此完整 TUN 样例。
@@ -91,7 +98,10 @@ git diff --check
 
 2026-09-06 本机复核：Apple Silicon macOS 26.6.2、官方 sing-box 1.14.0，两份公开样例
 `check` 均 exit 0、无诊断输出。仅有敏感字段被替换的结构比较通过；提交文件的敏感值扫描通过。
-这些检查不需要本地 SRS 文件，不执行 `run`，不创建 TUN、不连接示例地址，也不证明启动可用。
+本次 DNS 修订后已重新执行两份公开样例及两份私密候选的精确 1.14.0 `check`，均 exit 0。
+本机现有两个系统 DNS 上游的四次 UDP/TCP 查询经内核 socket 选项绑定 en4，均获得有效 DNS 响应；
+这仅确认当前出口前提，原始地址与响应记录留在私密目录，不证明 TUN 中的本地域解析。
+这些配置检查不需要本地 SRS 文件，不执行 `run`，不创建 TUN、不连接示例地址，也不证明启动可用。
 
 现有 macOS CI 增加这两份样例的 `check`，使用该 job 安装的 Homebrew 当前稳定版并记录实际版本；
 它与上述精确 1.14.0 本机复核分别记账。CI 是否通过，以 PR 的实际检查状态为准。
