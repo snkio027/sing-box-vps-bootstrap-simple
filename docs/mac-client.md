@@ -110,5 +110,7 @@ rmdir "$HOME/Library/Application Support/sing-box-vps/running.lock"
 本地工具是 Linux Bash 5.2.21、jq 1.7、OpenSSL 3.0.13；这些结果不等于最新 Homebrew 组合实测。
 
 macOS 原生 CI 已改为先更新以上依赖，再使用 Homebrew Bash 和 sing-box 检查；
-当前 GitHub 写入权限受限，CI 尚未运行。**最新依赖组合、真实 Mac 启动、en4 绑定及 Mac → VPS → HTTPS 均为 NOT RUN。**
-本轮未操作你的 Mac 或 VPS，未读取受保护的连接文件。
+上述候选版记录时 GitHub 写入权限受限，CI 尚未运行。
+**本脚本的最新 Homebrew 依赖组合、真实启动、en4 绑定及 HTTPS 完整流程仍为 NOT RUN。**
+随后独立临时客户端已完成真实链路检查；其结果与本脚本验收分别记录在
+[注释与独立建仓记录](commentary-validation.md)。公开仓库不包含任何真实配置或连接文件。

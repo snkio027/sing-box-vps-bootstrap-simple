@@ -1,5 +1,9 @@
 # Working agreement
 
+This repository, `sing-box-vps-bootstrap-simple`, is the primary workspace for
+further development. Run commands and make commits in this repository; keep the
+previous controller workspace and private operator reports outside it.
+
 The user reset this project on 2026-09-06: one Bash installer for one Ubuntu VPS,
 then authorized an equally simple companion client script for the Mac.
 The previous controller, schemas and ADRs are historical at commit

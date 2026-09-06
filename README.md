@@ -1,7 +1,11 @@
-# sing-box-vps-bootstrap
+# sing-box-vps-bootstrap-simple
 
 上传一个 Bash 文件到 Ubuntu VPS，执行后安装 sing-box、生成 SS2022 配置并启动 systemd 后台服务。
 目标：Ubuntu 24.04，amd64/arm64，1 GiB 内存、20 GiB 磁盘，单用户 IPv4 TCP 443。
+
+这是独立维护的精简项目；开发、测试与提交均以本仓库根目录为工作目录。
+服务端、Mac 客户端及测试脚本带有中文注释，说明执行顺序、权限、重复执行、失败处理与验证边界。
+注释版的改动与检查记录见 [注释与独立建仓记录](docs/commentary-validation.md)。
 
 ## 使用
 

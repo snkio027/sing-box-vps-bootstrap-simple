@@ -2,6 +2,8 @@
 
 ## 0.2.0 — 2026-09-06（开发中）
 
+- 独立为 `sing-box-vps-bootstrap-simple`；为两个入口及测试脚本补充中文注释，保持可执行内容不变。
+
 - 按用户追加要求，客户端改用 Homebrew 最新稳定依赖与 Homebrew Bash；移除固定客户端包下载和系统 Bash/plutil 依赖。
 
 - 增加独立 Mac Bash 客户端：私密配置导入、回环 SOCKS5、物理网卡绑定和一次 HTTPS 检查。

@@ -6,7 +6,9 @@
 当前事实源只有 README、AGENTS 和 Bash 脚本。移出首版：Python 控制器、Manifest/JCS/generation、
 事务及跨重启续跑、完整 SSH/UFW 管理、密钥轮换、升级编排、配置交接事务和 Mac 正式测量框架。
 
-旧实现、规范、测试和证据保留在 Git 历史 `d559ca25ab00aa1af35d39ca266f082d1248f68c`。
+旧实现、规范、测试和证据保留在原仓库的
+[`d559ca25ab00aa1af35d39ca266f082d1248f68c`](https://github.com/snkio027/sing-box-vps-bootstrap/commit/d559ca25ab00aa1af35d39ca266f082d1248f68c)。
+当前精简项目独立建仓，不复制原仓库历史、私有连接文件或真实报告。
 旧工作区的未提交改动没有被本次重建覆盖。新版本不自动迁移已部署的旧控制器。
 
 沿用已核验的 sing-box 1.14.0 官方包和内层二进制摘要；改为仅安装二进制和我们自己的 unit，

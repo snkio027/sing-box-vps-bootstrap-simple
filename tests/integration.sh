@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 # Run only on the disposable Ubuntu VM provisioned by tests/run_vm.py.
+# 破坏性集成测试：会安装/升级包、创建 swap、改写测试 unit 并启动合成服务。
+# 只能在 run_vm.py 创建的一次性 Ubuntu guest 中运行，绝不能在真实 VPS 上试跑。
+# 标记文件用于防止误执行；它不是针对恶意调用者的隔离边界。
 set -Eeuo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 umask 077
@@ -9,6 +12,8 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 INSTALLER="$ROOT/scripts/prepare-vps.sh"
 WORK=$(mktemp -d)
 CLIENT='' ORIGIN='' CONFLICT=''
+# 只回收本测试启动的 PID；真实安装的 sing-box 由 guest 的 systemd 管理。
+# 整台测试 VM 最终关机并丢弃，清理临时文件不表示安装具备通用回滚能力。
 cleanup() {
     local pid
     for pid in "$CLIENT" "$ORIGIN" "$CONFLICT"; do
@@ -18,6 +23,7 @@ cleanup() {
 }
 trap cleanup EXIT
 pass() { printf 'PASS %s\n' "$1"; }
+# 这里只测量 sshd_config 文件不变，不冒充完整 SSH 配置/会话连续性证明。
 SSH_BEFORE=$(sha256sum /etc/ssh/sshd_config)
 
 # Wait for cloud-init's existing time provider, without changing it.
@@ -39,6 +45,7 @@ grep -Fq 'TCP 443 is occupied' "$WORK/conflict-output"
 kill "$CONFLICT"; wait "$CONFLICT" 2>/dev/null || true; CONFLICT=
 pass 'foreign loopback listener rejected before installation'
 
+# 用实际入口走完整安装与显式系统升级，检查服务账号、权限及首次 swap 持久化。
 bash "$INSTALLER" --upgrade-system >"$WORK/install.log" 2>&1 || { cat "$WORK/install.log"; exit 1; }
 systemctl is-enabled --quiet sing-box
 systemctl is-active --quiet sing-box
@@ -72,6 +79,7 @@ cmp "$UNIT" "$WORK/good.service"
 systemctl is-active --quiet sing-box
 pass 'missing AF_NETLINK reproduces the failure; rerun repairs service without changing the key'
 
+# 健康重跑必须保留 PID、配置/密钥、fstab 和 swap 的文件身份；APT 刷新仍允许发生。
 PID=$(systemctl show sing-box -p MainPID --value)
 CONFIG_BEFORE=$(sha256sum /etc/sing-box/config.json)
 FSTAB_BEFORE=$(sha256sum /etc/fstab)
@@ -83,6 +91,9 @@ bash "$INSTALLER" >"$WORK/repeat.log" 2>&1 || { cat "$WORK/repeat.log"; exit 1; 
 [[ $(stat -c '%d:%i:%s' /var/lib/sing-box/swapfile) == "$SWAP_BEFORE" ]]
 pass 'rerun preserves key/config, swap, fstab and service process'
 
+# 在同一 guest 内搭建合成 HTTPS origin 与独立 SS2022 客户端。
+# curl 只对本次测试显式信任临时证书，并继续验证 localhost 主机名；不使用 -k。
+# 这验证真实协议请求，但不证明公网防火墙、Mac 网卡或跨地区链路质量。
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj /CN=localhost \
     -addext subjectAltName=DNS:localhost -keyout "$WORK/tls.key" -out "$WORK/tls.crt" >"$WORK/cert.log" 2>&1
 python3 "$ROOT/tests/https_fixture.py" "$WORK/tls.crt" "$WORK/tls.key" &
@@ -102,6 +113,7 @@ curl --fail --silent --show-error --max-time 15 --noproxy '' --proxy socks5h://1
 [[ $(cat "$WORK/response") == proxy-ok ]]
 pass 'real SS2022 HTTPS request with normal certificate and hostname verification'
 kill "$CLIENT"; wait "$CLIENT" 2>/dev/null || true; CLIENT=
+# 换错客户端密钥后，必须无法得到同一 HTTPS 响应，防止测试意外绕过代理。
 openssl rand -base64 16 > "$WORK/wrong-key"
 jq --rawfile key "$WORK/wrong-key" '.outbounds[0].password=($key|rtrimstr("\n"))' \
     "$WORK/client.json" > "$WORK/wrong.json"
