@@ -1,0 +1,123 @@
+{
+  "baseline_commit": "12963a7bb3dc243ec43ce4047ca72f06b0a9ff73",
+  "measurement_date": "2026-09-06",
+  "provenance": "Redacted operator-local measurements; raw configurations, identities, addresses and logs remain private. Not independently rerun by a reviewer.",
+  "environment": {
+    "os": "macOS 26.6.2",
+    "architecture": "arm64",
+    "sing_box": "1.14.0",
+    "binary_sha256": "973388c3f720e918fc64dff7fd75dde14b31cc1aa6fc15855e2f00c5291dd4f4"
+  },
+  "change": {
+    "route.auto_detect_interface": true,
+    "explicit_vps_bind_interface": "en4",
+    "pod_specific_reject_rules": false
+  },
+  "before": {
+    "self_recaptured_udp_sessions": 2075,
+    "cpu_percent": 177.461,
+    "cpu_window_seconds": 3.009
+  },
+  "after": {
+    "self_recaptured_udp_sessions": 0,
+    "cpu_percent": 0.594,
+    "cpu_window_seconds": 10.106
+  },
+  "verification_exit_code": 0,
+  "assertions": [
+    {
+      "name": "no_self_recapture_before_probes",
+      "pass": true,
+      "cpu_percent": 0.594,
+      "seconds": 10.106
+    },
+    {
+      "name": "different_pod_and_private_ip_no_self_recapture",
+      "pass": true,
+      "targets": 4,
+      "datagrams": 8,
+      "maximum_udp_sessions": 8
+    },
+    {
+      "name": "udp_outbound_interfaces_exclude_tun",
+      "pass": true,
+      "interfaces": [
+        "en4"
+      ]
+    },
+    {
+      "name": "tun_apple",
+      "pass": true,
+      "exit": 0,
+      "meta": "200:0:0"
+    },
+    {
+      "name": "tun_cloudflare",
+      "pass": true,
+      "exit": 0,
+      "meta": "200:0:0",
+      "expected_vps_exit": true
+    },
+    {
+      "name": "socks_apple",
+      "pass": true,
+      "exit": 0,
+      "meta": "200:0:0"
+    },
+    {
+      "name": "socks_cloudflare",
+      "pass": true,
+      "exit": 0,
+      "meta": "200:0:0",
+      "expected_vps_exit": true
+    },
+    {
+      "name": "loopback_via_local_direct",
+      "pass": true,
+      "exit": 0,
+      "http": "200"
+    },
+    {
+      "name": "container_bridge_via_local_direct",
+      "pass": true,
+      "exit": 0,
+      "http": "200"
+    },
+    {
+      "name": "orb_domain_via_local_direct",
+      "pass": true,
+      "exit": 0,
+      "http": "200"
+    },
+    {
+      "name": "dns_unchanged",
+      "pass": true
+    },
+    {
+      "name": "proxy_unchanged",
+      "pass": true
+    },
+    {
+      "name": "authenticated_api_rule_mode",
+      "pass": true
+    },
+    {
+      "name": "service_stable",
+      "pass": true
+    },
+    {
+      "name": "no_self_recapture_after_all_checks",
+      "pass": true
+    },
+    {
+      "name": "launchd_plist_unchanged",
+      "pass": true
+    }
+  ],
+  "not_run": [
+    "new-configuration whole-machine reboot",
+    "complete Pod workload networking",
+    "other VPNs / interface switching"
+  ],
+  "performance_conclusion": "Download speed still varies; root cause unresolved. SSH comparison tracked separately."
+}
