@@ -27,6 +27,11 @@ jobs:
       - run: brew update && brew install --formula bash curl jq openssl sing-box && brew upgrade --formula --no-ask bash curl jq openssl sing-box
       - run: /opt/homebrew/bin/bash -n scripts/connect-vps.sh
       - run: /opt/homebrew/bin/bash tests/client-unit.sh
+      - name: Check redacted configuration examples without starting TUN
+        run: |
+          /opt/homebrew/bin/sing-box version
+          /opt/homebrew/bin/sing-box check -D "$PWD/examples/1.14.0" -c "$PWD/examples/1.14.0/server.example.json"
+          /opt/homebrew/bin/sing-box check -D "$PWD/examples/1.14.0" -c "$PWD/examples/1.14.0/macos.example.json"
   vm:
     needs: static
     runs-on: ubuntu-24.04

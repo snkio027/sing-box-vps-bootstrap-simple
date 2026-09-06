@@ -1,0 +1,329 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "type": "https",
+        "tag": "dns-proxy",
+        "server": "1.1.1.1",
+        "server_port": 443,
+        "path": "/dns-query",
+        "tls": {
+          "enabled": true,
+          "server_name": "cloudflare-dns.com"
+        },
+        "detour": "vps"
+      },
+      {
+        "type": "https",
+        "tag": "dns-direct",
+        "server": "223.5.5.5",
+        "server_port": 443,
+        "path": "/dns-query",
+        "tls": {
+          "enabled": true,
+          "server_name": "dns.alidns.com"
+        },
+        "bind_interface": "en4"
+      },
+      {
+        "type": "local",
+        "tag": "dns-local",
+        "prefer_go": false,
+        "bind_interface": "en4"
+      },
+      {
+        "type": "fakeip",
+        "tag": "dns-fakeip",
+        "inet4_range": "198.18.0.0/15"
+      }
+    ],
+    "rules": [
+      {
+        "domain_suffix": [
+          "local",
+          "lan",
+          "home.arpa"
+        ],
+        "domain_regex": [
+          "^[^.]+$"
+        ],
+        "action": "route",
+        "server": "dns-local"
+      },
+      {
+        "query_type": [
+          "AAAA"
+        ],
+        "action": "predefined",
+        "rcode": "NOERROR",
+        "answer": []
+      },
+      {
+        "rule_set": [
+          "geosite-ads"
+        ],
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+      {
+        "clash_mode": "direct",
+        "action": "route",
+        "server": "dns-direct"
+      },
+      {
+        "clash_mode": "global",
+        "inbound": [
+          "tun-in",
+          "mixed-in"
+        ],
+        "query_type": [
+          "A"
+        ],
+        "action": "route",
+        "server": "dns-fakeip"
+      },
+      {
+        "clash_mode": "global",
+        "action": "route",
+        "server": "dns-proxy"
+      },
+      {
+        "rule_set": [
+          "geosite-cn"
+        ],
+        "action": "route",
+        "server": "dns-direct"
+      },
+      {
+        "inbound": [
+          "tun-in",
+          "mixed-in"
+        ],
+        "query_type": [
+          "A"
+        ],
+        "action": "route",
+        "server": "dns-fakeip"
+      }
+    ],
+    "final": "dns-proxy",
+    "strategy": "ipv4_only",
+    "cache_capacity": 4096,
+    "timeout": "10s"
+  },
+  "http_clients": [
+    {
+      "tag": "rules-via-vps",
+      "engine": "go",
+      "version": 2,
+      "detour": "vps"
+    }
+  ],
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.28.255.1/30",
+        "fdfe:dcba:9877::1/126"
+      ],
+      "mtu": 1500,
+      "auto_route": true,
+      "strict_route": true,
+      "stack": "system",
+      "dns_mode": "hijack"
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 17890
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "shadowsocks",
+      "tag": "vps",
+      "server": "198.51.100.10",
+      "server_port": 443,
+      "method": "2022-blake3-aes-128-gcm",
+      "password": "AAECAwQFBgcICQoLDA0ODw==",
+      "network": "tcp",
+      "multiplex": {
+        "enabled": false
+      },
+      "bind_interface": "en4",
+      "connect_timeout": "10s"
+    },
+    {
+      "type": "direct",
+      "tag": "direct",
+      "bind_interface": "en4",
+      "domain_resolver": "dns-direct",
+      "connect_timeout": "10s"
+    },
+    {
+      "type": "direct",
+      "tag": "local-direct",
+      "domain_resolver": "dns-local",
+      "connect_timeout": "10s"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "port": [
+          53
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "network": [
+          "tcp"
+        ],
+        "action": "sniff",
+        "sniffer": [
+          "http",
+          "tls"
+        ],
+        "timeout": "300ms"
+      },
+      {
+        "ip_cidr": [
+          "198.51.100.10/32"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "local-direct"
+      },
+      {
+        "domain_suffix": [
+          "local",
+          "lan",
+          "home.arpa"
+        ],
+        "domain_regex": [
+          "^[^.]+$"
+        ],
+        "action": "route",
+        "outbound": "local-direct"
+      },
+      {
+        "ip_version": 6,
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+      {
+        "rule_set": [
+          "geosite-ads"
+        ],
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+      {
+        "clash_mode": "direct",
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "clash_mode": "global",
+        "network": [
+          "udp",
+          "icmp"
+        ],
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      },
+      {
+        "clash_mode": "global",
+        "action": "route",
+        "outbound": "vps"
+      },
+      {
+        "rule_set": [
+          "geosite-cn"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geoip-cn"
+        ],
+        "action": "route",
+        "outbound": "direct"
+      },
+      {
+        "network": [
+          "udp",
+          "icmp"
+        ],
+        "action": "reject",
+        "method": "default",
+        "no_drop": true
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geosite-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs",
+        "initial_path": "rules/geosite-cn.srs",
+        "http_client": "rules-via-vps",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geoip/cn.srs",
+        "initial_path": "rules/geoip-cn.srs",
+        "http_client": "rules-via-vps",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-ads",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ads-all.srs",
+        "initial_path": "rules/geosite-ads.srs",
+        "http_client": "rules-via-vps",
+        "update_interval": "1d"
+      }
+    ],
+    "final": "vps",
+    "default_domain_resolver": "dns-proxy",
+    "default_http_client": "rules-via-vps"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "cache_id": "single-vps-1.14.0",
+      "store_fakeip": true
+    },
+    "clash_api": {
+      "external_controller": "127.0.0.1:19090",
+      "secret": "REPLACE_WITH_A_RANDOM_LOCAL_API_SECRET",
+      "default_mode": "rule",
+      "access_control_allow_origin": [
+        "http://localhost",
+        "http://127.0.0.1"
+      ],
+      "access_control_allow_private_network": false
+    }
+  }
+}

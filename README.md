@@ -74,6 +74,12 @@ systemctl restart sing-box
 使用 Homebrew 当前稳定版，明确使用 Homebrew 工具路径。无需 sudo 或 Python。
 使用方法与限制见 [Mac 客户端说明](docs/mac-client.md)。
 
+## 完整配置审查样例
+
+用于通过自有 VPS 替换现用 Mac 代理的 sing-box 1.14.0 两端脱敏配置，见
+[配置样例与审查说明](examples/1.14.0/README.md)。包括本地路由、系统本地域解析、GeoIP 边界和协议限制。
+样例使用公开测试地址与测试密钥，不可直接部署；完整 TUN 与正式切换仍待验收。
+
 ## 开发与验证
 
 ```sh
