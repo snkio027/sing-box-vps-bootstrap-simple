@@ -21,9 +21,10 @@
 
 ## 本轮修订
 
-1. **本地出站不绑网卡。** `local-direct` 不设置 `bind_interface`，全局也不设置
-   `default_interface` 或启用 `auto_detect_interface`。本机、私有地址和本地域名依赖系统已有
-   lo0、桥接或 VPN 路由；VPS、普通公网 direct 和国内 DoH 继续绑定 `en4`。
+1. **未显式绑定的出站启用自动接口保护。** 设置 `route.auto_detect_interface=true`；
+   `local-direct` 不硬编码 `bind_interface`，全局不指定 `default_interface`。VPS、普通公网
+   direct 和国内 DoH 的显式 `en4` 绑定保持不变。自动接口保护用于防止自身 TUN 回环，
+   不会创建到容器、私网或其他 VPN 的可达路由；这些路径仍需分别验证。
 2. **本地域名读取系统解析配置，上游连接绑定 en4。** `dns-local` 保留 `type=local`、
    `prefer_go=false`，新增 `bind_interface=en4`。1.14.0 可自行向系统 DNS 上游发出查询，
    `prefer_go=false` 不保证每次由 macOS 代发；绑定物理接口避免这些上游连接依赖 TUN 默认路由，
@@ -53,7 +54,7 @@
 
 | 流量 | 默认 rule 模式 |
 |---|---|
-| 本机、私有地址、本地域名 | local-direct，按系统已有路由转发 |
+| 本机、私有地址、本地域名 | local-direct，自动接口保护；可达路径另行验证 |
 | VPS 地址 | en4 直连，避免到 VPS 的 SSH 等连接绕回代理 |
 | 国内域名列表中的普通 TCP | en4 直连 |
 | 其他普通域名 TCP | 经 VPS |
@@ -112,8 +113,14 @@ git diff --check
 |---|---|
 | JSON 解析、精确 1.14.0 配置检查、脱敏结构比较 | PASS，exit 0 |
 | 样例地址/公开测试密钥的真实代理请求 | NOT RUN；这些值不得用于部署 |
-| 完整 TUN 启停、日常代理正式替换、开机启动 | NOT RUN |
-| OrbStack、容器与 Kubernetes 实际服务 | NOT RUN |
+| 本次修订的完整 TUN 退出恢复、整机重启自启 | NOT RUN；有限现场验证见下文 |
+| 完整 OrbStack / Kubernetes 业务网络 | NOT RUN；有限本地访问场景见下文 |
 
 公开仓库没有附带真实主机证据。私密候选的有限测试不能被当作这份公开样例的实际部署证明，
 更不能替代完整 TUN、容器网络或正式切换验收。
+
+## 通用防回环修订
+
+本次只为公开 JSON 增加 `route.auto_detect_interface=true`，不加入 Pod IP 拒绝列表。
+对应现场配置已通过有限防回环、本地访问和 HTTPS 验证；速度仍有波动。
+[独立验证记录](../../docs/mac-tun-loop-validation.md)及其脱敏数据将这些结论与待验证项目分别记账。

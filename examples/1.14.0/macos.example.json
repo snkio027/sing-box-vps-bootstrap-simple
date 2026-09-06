@@ -306,7 +306,8 @@
     ],
     "final": "vps",
     "default_domain_resolver": "dns-proxy",
-    "default_http_client": "rules-via-vps"
+    "default_http_client": "rules-via-vps",
+    "auto_detect_interface": true
   },
   "experimental": {
     "cache_file": {
