@@ -37,6 +37,8 @@ pass 'physical interface input validation'
 
 # 权限、软/硬链接和受保护文件名均应拒绝；源文件和导出文件必须保持私有。
 # 此处使用外部 OpenSSL；后面的同名函数仅用于环境变量泄露回归测试。
+# Ubuntu runner 的旧版 ShellCheck 未识别 command 会绕过函数，仅对此调用关闭误报。
+# shellcheck disable=SC2218
 command openssl rand -base64 16 > "$TEMP/key-input"
 jq -n --rawfile key "$TEMP/key-input" '{inbounds:[{type:"shadowsocks",method:"2022-blake3-aes-128-gcm",listen_port:443,password:($key|rtrimstr("\n"))}]}' > "$TEMP/source.json"
 private_file "$TEMP/source.json"
