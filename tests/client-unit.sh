@@ -36,7 +36,8 @@ for invalid in utun5 lo0 'en4"' 'en4;id' ''; do reject valid_interface "$invalid
 pass 'physical interface input validation'
 
 # 权限、软/硬链接和受保护文件名均应拒绝；源文件和导出文件必须保持私有。
-openssl rand -base64 16 > "$TEMP/key-input"
+# 此处使用外部 OpenSSL；后面的同名函数仅用于环境变量泄露回归测试。
+command openssl rand -base64 16 > "$TEMP/key-input"
 jq -n --rawfile key "$TEMP/key-input" '{inbounds:[{type:"shadowsocks",method:"2022-blake3-aes-128-gcm",listen_port:443,password:($key|rtrimstr("\n"))}]}' > "$TEMP/source.json"
 private_file "$TEMP/source.json"
 chmod 0644 "$TEMP/source.json"
