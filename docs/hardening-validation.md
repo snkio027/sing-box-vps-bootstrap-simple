@@ -26,7 +26,9 @@ CI 首轮 `bd9f321` 的默认 socket 和 service 两台 VM 都在启用 UFW 前�
 随后核对 Ubuntu UFW 包的 `ufw-init-functions`：disable 特意保留空主链和跳转直到下次启动。
 恢复步骤据此增加操作者安排的 VM 重启，再验证恢复状态；生产脚本的未知规则检查保持不变，未加入全局清空。
 
-VM 当前正在执行修订版，结果未验收。复现命令（仅一次性 Linux 测试主机）：
+`135cd00` 的 service VM 通过 14 组；socket VM 完成实际安全更新后在最终 sshd 检查处失败，
+新管理员仍能建立连接。该模式尚未计 PASS，修订版保留具体检查日志以定位更新后的状态。
+VM 当前正在执行修订版，首批整体结果未验收。复现命令（仅一次性 Linux 测试主机）：
 
 ```sh
 sudo python3 -B tests/run_hardening_vm.py --ssh-mode socket

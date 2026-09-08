@@ -61,6 +61,13 @@ cleanup() {
     if [[ -n $GUARD_ID ]]; then
         printf 'Service-start guard retained; inspect the recorded identity and package locks before cleanup.\n' >&2
     fi
+    # 失败时仅保留明确列出的检查日志；候选目录及任何公钥输入仍留在私密边界内清理。
+    if (( code != 0 )) && [[ -n $WORK && -n $BACKUP ]]; then
+        local name
+        for name in ssh-candidate-check.log sshd-check.log restart-effective.log; do
+            [[ ! -f $WORK/$name ]] || install -m 0600 "$WORK/$name" "$BACKUP/$name"
+        done
+    fi
     [[ -z $WORK ]] || rm -rf -- "$WORK"
     if (( code != 0 )) && [[ -n $BACKUP ]]; then
         printf 'Incomplete; retained private backup: %s\nKeep SSH/console access; inspect recovery instructions.\n' "$BACKUP" >&2

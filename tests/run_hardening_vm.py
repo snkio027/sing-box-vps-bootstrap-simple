@@ -39,6 +39,7 @@ def main():
     start = time.time()
     status = 'FAIL'
     error = ''
+    observations = {}
     with tempfile.TemporaryDirectory(prefix='hardening-vm-') as directory:
         work = Path(directory)
         inputs = work / 'input'
@@ -172,6 +173,7 @@ runcmd:
             (work / 'known_hosts').write_text(f'[127.0.0.1]:{port} {host_key[0]} {host_key[1]}\n')
             ssh('test "$(cat /root/HARDENING_DISPOSABLE_VM)" = disposable-hardening-fixture; cloud-init status --wait >/dev/null')
             ssh('systemctl is-active --quiet ssh.' + ('socket' if mode == 'socket' else 'service'))
+            observations['guest_environment'] = ssh('uname -srv; cat /etc/os-release; python3 --version; bash --version | head -n 1')
             passed('fresh external bootstrap SSH using ' + mode + ' listener and pinned host key')
             firewall_facts = "for p in /etc/default/ufw /etc/ufw/*.rules; do test ! -f \"$p\" || sha256sum \"$p\"; done"
             firewall_before = ssh(firewall_facts)
@@ -247,7 +249,7 @@ ufw status | grep -Fxq 'Status: inactive'
             ssh('sudo -n true; sudo -n ufw status | grep -Fxq "Status: inactive"', user=ADMIN)
             ssh('rm /var/lib/sing-box-hardening/applying')
             passed('ordinary backup recovery preserves the administrator entry')
-            ssh(apply, user=ADMIN, label='real apply', timeout=1800)
+            observations['apply_output'] = ssh(apply, user=ADMIN, label='real apply', timeout=1800)
             ssh('test "$(id -un)" = fixtureadmin; test "$(sudo -n id -u)" = 0', user=ADMIN, label='new login after hardening')
             ssh('true', expected=255, label='previously working root key refused')
             for user, auth in ((ADMIN, 'password'), (ADMIN, 'keyboard-interactive'), ('root', 'password')):
@@ -278,7 +280,7 @@ AUDIT
             passed('dual-stack firewall and daily updates verified; no automatic machine reboot')
             before = ssh('sudo -n sha256sum /home/fixtureadmin/.ssh/authorized_keys; id -G; sudo -n iptables-save; sudo -n ip6tables-save', user=ADMIN)
             ssh('sudo -n ' + prepare, user=ADMIN, label='repeat prepare')
-            ssh(apply, user=ADMIN, label='repeat apply', timeout=1800)
+            observations['repeat_apply_output'] = ssh(apply, user=ADMIN, label='repeat apply', timeout=1800)
             after = ssh('sudo -n sha256sum /home/fixtureadmin/.ssh/authorized_keys; id -G; sudo -n iptables-save; sudo -n ip6tables-save', user=ADMIN)
             # iptables-save comments contain timestamps; counters are observational.
             def stable(text):
@@ -298,7 +300,7 @@ AUDIT
             print(error, flush=True)
             # Do not export config/keys or the complete VM disk. Only selected diagnostic logs.
             try:
-                logs = ssh('sudo -n bash -c ' + shlex.quote('B=$(cat /var/lib/sing-box-hardening/last-backup); for n in dependency-install.log ufw-apply.log security-dry-run.log security-run.log; do test ! -f "$B/$n" || tail -n 30 "$B/$n"; done; nft -j list ruleset; ufw status verbose'), user=ADMIN, label='failure diagnostics')
+                logs = ssh('sudo -n bash -c ' + shlex.quote('B=$(cat /var/lib/sing-box-hardening/last-backup); for n in dependency-install.log ufw-apply.log security-dry-run.log security-run.log ssh-candidate-check.log sshd-check.log restart-effective.log; do test ! -f "$B/$n" || tail -n 30 "$B/$n"; done; nft -j list ruleset; ufw status verbose; /usr/sbin/sshd -t; systemctl show ssh.service ssh.socket -p ActiveState -p SubState -p RuntimeDirectory; ls -ld /run/sshd'), user=ADMIN, label='failure diagnostics')
                 (output / 'diagnostics.log').write_text(logs)
             except Exception:
                 pass
@@ -312,7 +314,7 @@ AUDIT
                        'ssh_mode': mode, 'memory_mib': 1024, 'disk_bytes': 20 * 1024**3,
                        'architecture': 'amd64', 'acceleration': acceleration,
                        'elapsed_seconds': round(time.time() - start), 'assertions': assertions,
-                       'commands': executions, 'failure': error, 'real_vps': 'NOT RUN',
+                       'commands': executions, 'observations': observations, 'failure': error, 'real_vps': 'NOT RUN',
                        'complete_deployment': 'NOT RUN', 'private_export': 'NOT RUN',
                        'source_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                                          for name in (*SOURCES, 'tests/run_hardening_vm.py', 'tests/fixtures/ubuntu-cloud-image.json')}}
