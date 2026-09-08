@@ -2,6 +2,29 @@
 
 本页只记录 `harden-vps.sh`，不把此前手工加固的真实 VPS 证据冒充新入口实测。
 
+已验证的实现提交：[46bf541](https://github.com/snkio027/sing-box-vps-bootstrap-simple/commit/46bf541b67b5b42d6e88917b1db12714a649e1a0)。
+[本轮 CI](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34234154464) 的静态、Mac、原安装器 VM 和两套加固 VM 全部通过。
+第一批实现验证 **PASS，待独立评审**；不等于真实 VPS 或完整组合部署验收。
+
+| 加固 VM | 断言组 | SSH 命令记录 | 驱动退出码 |
+| --- | ---: | ---: | ---: |
+| 默认 ssh.socket | 15 | 64 | 0 |
+| ssh.service | 14 | 63 | 0 |
+
+两套均为 Ubuntu 24.04.4 amd64、KVM、1 GiB / 20 GiB、2 vCPU；初始内核 6.8.0-138-generic，
+Bash 5.2.21、Python 3.12.3。首次 apply 实际安装了安全更新并记录待重启；重复 apply 的包版本无变化。
+账号、公钥、组和 UFW 规则保持不变。UFW 中断恢复及最终完成后各做一次明确安排的 VM 重启，
+重新连接并检查 SSH、sudo、双栈防火墙和更新策略；轮询期间预期的短暂 SSH exit 255 单独保留。
+两份汇总中 127 次 SSH 命令的其余退出码与预期一致，6 项源码摘要（每份 3 项）全部匹配下表。
+
+本轮三个证据输入的 SHA-256：
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `scripts/harden-vps.sh` | `e818d91a59e7e8c1e203f52676a858238b019d747c8fc016c770a9a01106d91f` |
+| `tests/run_hardening_vm.py` | `fe6f431f00bc6e64d4fdc5b30e8aee03c324a3087f4bd1517178d2644f2b211f` |
+| `tests/fixtures/ubuntu-cloud-image.json` | `24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28` |
+
 2026-09-08：Bash 语法、ShellCheck 和 8 组本地参数/解析测试通过（macOS 26.6.2 arm64，Homebrew Bash，exit 0）。
 命令：
 
@@ -32,7 +55,7 @@ CI 首轮 `bd9f321` 的默认 socket 和 service 两台 VM 都在启用 UFW 前�
 修正为由 systemd 激活原 daemon 后再检查，不手工创建目录或跳过语法验证；另加真实 socket-only 状态的回归用例。
 `0c3fd51` 的 socket 完整 apply 与新连接通过；附加回归用例的日志匹配没有处理
 OpenSSH stderr 的 CRLF 而失败，改为仅去除 CR 后精确匹配，原有状态和退出码断言保留。
-VM 当前正在执行修订版，首批整体结果未验收。复现命令（仅一次性 Linux 测试主机）：
+`46bf541` 已通过上述全部 VM 场景。复现命令（仅一次性 Linux 测试主机）：
 
 ```sh
 sudo python3 -B tests/run_hardening_vm.py --ssh-mode socket
@@ -42,9 +65,11 @@ sudo python3 -B tests/run_hardening_vm.py --ssh-mode service
 规格为 Ubuntu 24.04 amd64、1 GiB 内存、20 GiB 虚拟磁盘、两个 vCPU。
 固定云镜像的大小与 SHA-256 先验证。只共享明确列出的脚本和合成公钥，私钥留在测试 host。
 host key 从本次受控 guest 的只读公钥材料建立信任，全新 SSH 不复用连接、不跳过身份验证。
-每份 `summary.json` 保存实际命令、退出码、断言和本次脚本/驱动/镜像定义的源码摘要。
+每份 `summary.json` 保存实际命令、退出码、断言、环境、首次/重复 apply 输出和源码摘要。
+CI 制品名为 `hardening-vm-socket`、`hardening-vm-service`，包含汇总与结果日志，保留 14 天。
+这些是合成目标证据；只共享明确文件，未上传私钥、完整 VM 磁盘或真实 VPS 材料。
 
-覆盖目标：错误输入端口、有效配置/实际 socket 不一致、非法公钥、不兼容目标账号、
+已覆盖：错误输入端口、有效配置/实际 socket 不一致、非法公钥、不兼容目标账号、
 准备与收紧分开、新管理员公钥及 sudo、SSH Include 冲突、未知 nftables、UFW 后中断、
 普通备份恢复、禁止认证方式、每日更新、重复执行和受控 VM 重启。
 
