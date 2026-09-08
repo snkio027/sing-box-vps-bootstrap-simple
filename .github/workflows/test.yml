@@ -17,6 +17,7 @@ jobs:
       - run: shellcheck -x scripts/*.sh tests/*.sh
       - run: sudo bash tests/unit.sh
       - run: bash tests/client-unit.sh
+      - run: bash tests/hardening-unit.sh
   mac-client:
     runs-on: macos-26
     timeout-minutes: 10
@@ -49,5 +50,28 @@ jobs:
         with:
           name: simple-vm-result
           path: artifacts/simple-vm/
+          if-no-files-found: warn
+          retention-days: 14
+  hardening-vm:
+    needs: static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        ssh-mode: [socket, service]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install disposable VM test tools
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils
+      - name: Test separate preparation and hardening with fresh SSH sessions
+        run: sudo python3 -B tests/run_hardening_vm.py --ssh-mode '${{ matrix.ssh-mode }}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: hardening-vm-${{ matrix.ssh-mode }}
+          path: artifacts/hardening-vm-${{ matrix.ssh-mode }}/
           if-no-files-found: warn
           retention-days: 14

@@ -14,6 +14,9 @@ The previous controller, schemas and ADRs are historical at commit
 - Read this file, README.md and relevant script/tests before editing.
 - Ship `scripts/prepare-vps.sh` as one Bash file, without a build step or Python runtime.
 - Ship `scripts/connect-vps.sh` as one Bash file for Apple Silicon macOS.
+- Ship `scripts/harden-vps.sh` as a separate Ubuntu Bash entry with `prepare` and
+  `apply` calls. prepare creates/validates only the target key administrator; apply
+  runs from a new administrator SSH/sudo session after console access is confirmed.
 - The user requires current stable client dependencies: Homebrew Bash, curl, jq,
   OpenSSL and sing-box. Use explicit Homebrew paths, require its current Bash
   (5.3+), and refuse dependencies reported outdated after the preparation update.
@@ -24,8 +27,16 @@ The previous controller, schemas and ADRs are historical at commit
 - APT refresh/dependencies, explicit optional system upgrade, conditional 1 GiB swap,
   private configuration and a non-root systemd service are the first version.
 - Use ordinary backups and clear errors. No general transaction/recovery engine,
-  generated release pair, SSH migration, rotation or Mac measurement framework.
-- Preserve existing SSH, firewall and Mac networking. Report the TCP 443 prerequisite.
+  generated release pair, SSH port migration, rotation or Mac measurement framework.
+- `prepare-vps.sh` preserves SSH and firewall; `connect-vps.sh` preserves Mac
+  networking. `harden-vps.sh` owns the explicitly selected administrator, SSH
+  authentication tightening, dual-stack UFW and daily security-update policy.
+  Verify the input SSH port against effective sshd config, actual listeners and
+  active ssh.socket before firewall writes; add the verified SSH allow rule before
+  enabling restrictive defaults. Refuse incompatible target accounts/unknown rules.
+- Hardening deliberately grants full NOPASSWD administrator elevation. Daily
+  security updates may restart necessary services and briefly interrupt access;
+  automatic machine reboot remains forbidden. Keep prepare/apply separate.
 
 ## Execution boundaries
 
@@ -50,3 +61,8 @@ The previous controller, schemas and ADRs are historical at commit
   Ubuntu VM before calling it tested. VM evidence does not establish a real Mac link.
 - Reports contain revision, commands, outcomes and remaining limits. Routine details
   do not need an ADR or another design approval.
+- Hardening tests require disposable Ubuntu service/socket SSH modes, new external
+  key sessions, wrong-port rejection, interruption/recovery and repeated execution.
+  First-batch hardening PASS is not complete deployment. After private export exists,
+  test prepare → new SSH → apply → prepare-vps → export → client import → HTTPS in
+  one clean VM, then repeat and reboot before claiming the whole flow reproducible.
