@@ -255,6 +255,27 @@ ufw status | grep -Fxq 'Status: inactive'
             for user, auth in ((ADMIN, 'password'), (ADMIN, 'keyboard-interactive'), ('root', 'password')):
                 ssh('true', user=user, auth=auth, expected=255, label=user + ' ' + auth + ' refused')
             passed('apply completes and fresh SSH allows only administrator public-key authentication')
+            if mode == 'socket':
+                # A socket listener can remain healthy with its daemon stopped and /run/sshd gone.
+                # Reproduce the update handoff inside the existing session, then activate via systemd.
+                ssh("""sudo -n bash -s <<'READY'
+source /usr/local/libexec/harden-vps.sh
+WORK=$(mktemp -d /run/hardening-ready.XXXXXXXX)
+BACKUP=$WORK
+trap 'rm -rf "$WORK"' EXIT
+systemctl stop ssh.service
+systemctl is-active --quiet ssh.socket
+! systemctl is-active --quiet ssh.service
+if /usr/sbin/sshd -t > "$WORK/stopped-check" 2>&1; then exit 1; fi
+grep -Fxq 'Missing privilege separation directory: /run/sshd' "$WORK/stopped-check"
+ensure_ssh_ready_after_updates
+/usr/sbin/sshd -t
+SSH_PORT=22
+check_ssh_port
+READY
+""", user=ADMIN, label='socket-only SSH handoff and daemon activation')
+                ssh('sudo -n true', user=ADMIN, label='fresh key connection after socket-only recovery')
+                passed('socket-only state is activated before SSH validation; fresh key access succeeds')
             audit = '''set -eu
 sudo -n sha256sum -c /var/lib/sing-box-hardening/managed.sha256 >/dev/null
 sudo -n sha256sum -c /var/lib/sing-box-hardening/ufw-files.sha256 >/dev/null

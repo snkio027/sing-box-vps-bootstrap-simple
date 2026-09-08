@@ -471,6 +471,15 @@ configure_updates() {
     [[ ! -e /run/reboot-required ]] || say 'REBOOT_REQUIRED: arrange an explicit maintenance reboot; no reboot was requested.'
 }
 
+# 更新工具可能只重启 socket、停下 daemon 并移除它的 RuntimeDirectory。
+# apply 已获准管理 SSH 服务；由 systemd 激活原 daemon 后再做 -t/-T 和 listener 验证。
+# start 对已运行服务无操作，不改变 socket 的启用方式，也不手工制造 /run/sshd。
+ensure_ssh_ready_after_updates() {
+    if systemctl is-active --quiet ssh.socket; then
+        timeout 60 systemctl start ssh.service > "$BACKUP/ssh-ready.log" 2>&1 || die 'SSH daemon failed to activate after updates.'
+    fi
+}
+
 render_restart_policy() {
     printf '%s\n' "$MARKER"
     cat <<'EOF'
@@ -508,6 +517,7 @@ apply_hardening() {
     STEP=security-updates
     configure_updates
     STEP=verification
+    ensure_ssh_ready_after_updates
     check_effective_ssh /etc/ssh/sshd_config
     check_ssh_port
     verify_firewall

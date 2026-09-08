@@ -75,6 +75,8 @@ sudo --preserve-env=SSH_CONNECTION bash /usr/local/sbin/harden-vps.sh apply \
 7. 设置每日索引刷新与仅 Ubuntu security 来源的无人值守更新，启用两个 APT timer；
    明确配置 needrestart 自动模式并核对最终生效值。
    首次运行包含实际刷新、dry-run 和实际更新；未找到更新时如实记录没有包版本变化。
+   更新可能让 ssh.socket 保持监听而 daemon 回到未激活状态；结束前由 systemd 启动原 ssh.service，
+   再验证 sshd 配置与真实端口。已运行时 start 不重启服务，也不改变 socket 的开机启动方式。
 
 **每日安全更新允许必要的服务重启和短暂中断，禁止自动整机重启。**
 首次 apply 应在可接受中断的时间运行。系统包的默认服务排除项仍由 Ubuntu 管理；
