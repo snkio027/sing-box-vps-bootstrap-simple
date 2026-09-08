@@ -189,6 +189,10 @@ runcmd:
             ssh(apply, user=ADMIN, expected=1, label='unknown native firewall', timeout=600, match='Unknown native firewall')
             ssh("nft -j list ruleset > /root/nft-after.json; cmp /root/nft-before.json /root/nft-after.json; test ! -e /var/lib/sing-box-hardening/applying; nft delete table inet fixture_unknown")
             passed('unknown native firewall is preserved and rejected')
+            ssh('cp /etc/ufw/user.rules /root/fixture-user.rules; cp /etc/ufw/user6.rules /root/fixture-user6.rules; ufw allow 12345/tcp >/dev/null; sha256sum /etc/ufw/user.rules /etc/ufw/user6.rules > /root/fixture-custom.sha256')
+            ssh(apply, user=ADMIN, expected=1, label='unknown stored UFW rule', match='Unmanaged UFW control')
+            ssh('sha256sum -c /root/fixture-custom.sha256 >/dev/null; cp /root/fixture-user.rules /etc/ufw/user.rules; cp /root/fixture-user6.rules /etc/ufw/user6.rules')
+            passed('stored custom UFW rules are refused and preserved')
             # Inject TERM immediately after real UFW configuration using a test-only wrapper.
             # Production entry has no fault/debug flags. SSH policy has not yet been published.
             wrapper = f'''#!/usr/bin/bash
@@ -237,6 +241,15 @@ systemctl is-active --quiet apt-daily.timer
 systemctl is-active --quiet apt-daily-upgrade.timer
 sudo -n apt-config dump | grep -F 'Unattended-Upgrade::Automatic-Reboot "false";'
 test ! -e /usr/sbin/policy-rc.d
+sudo -n bash -s <<'AUDIT'
+source /usr/local/libexec/harden-vps.sh
+WORK=$(mktemp -d /run/hardening-audit.XXXXXXXX)
+trap 'rm -rf "$WORK"' EXIT
+SSH_PORT=22
+render_restart_policy > "$WORK/needrestart"
+verify_firewall
+verify_updates
+AUDIT
 '''
             ssh(audit, user=ADMIN, label='firewall and daily updates audit')
             passed('dual-stack firewall and daily updates verified; no automatic machine reboot')
@@ -269,6 +282,7 @@ test ! -e /usr/sbin/policy-rc.d
             ssh(audit, user=ADMIN, label='post-reboot firewall/update persistence')
             ssh('sudo -n true; systemctl is-active --quiet ufw.service', user=ADMIN, label='post-reboot key and sudo')
             ssh('true', expected=255, label='post-reboot root denied')
+            ssh('true', user=ADMIN, auth='password', expected=255, label='post-reboot password not offered')
             passed('controlled VM reboot: new key SSH, sudo, UFW and update policy persist')
             status = 'PASS'
         except Exception as exc:

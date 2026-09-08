@@ -56,9 +56,10 @@ safe_root_path() {
 
 cleanup() {
     local code=$?
-    # 只删除本次独占创建的服务启动保护文件，已有 policy-rc.d 直接拒绝，不接管。
-    if [[ -n $GUARD_ID && -f /usr/sbin/policy-rc.d && ! -L /usr/sbin/policy-rc.d ]]; then
-        if [[ $(stat -c '%d:%i' /usr/sbin/policy-rc.d) == "$GUARD_ID" ]] && cmp -s /usr/sbin/policy-rc.d "$BACKUP/policy-rc.d.created"; then rm /usr/sbin/policy-rc.d; fi
+    # 包安装失败/中断时，子进程可能尚未结束；保留保护文件供操作者核对包锁后清理。
+    # 正常成功路径在 install_dependencies 内按身份和内容删除，已有文件从不接管。
+    if [[ -n $GUARD_ID ]]; then
+        printf 'Service-start guard retained; inspect the recorded identity and package locks before cleanup.\n' >&2
     fi
     [[ -z $WORK ]] || rm -rf -- "$WORK"
     if (( code != 0 )) && [[ -n $BACKUP ]]; then
@@ -255,8 +256,8 @@ install_dependencies() {
     GUARD_ID=$(stat -c '%d:%i' /usr/sbin/policy-rc.d)
     printf '%s\n' "$GUARD_ID" > "$BACKUP/policy-rc.d.identity"
     chmod 0755 /usr/sbin/policy-rc.d
-    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get -o DPkg::Lock::Timeout=120 update > "$BACKUP/dependency-update.log" 2>&1
-    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends jq nftables ufw unattended-upgrades needrestart > "$BACKUP/dependency-install.log" 2>&1
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l timeout 300 apt-get -o DPkg::Lock::Timeout=120 update > "$BACKUP/dependency-update.log" 2>&1
+    DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l timeout 600 apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends jq nftables ufw unattended-upgrades needrestart > "$BACKUP/dependency-install.log" 2>&1
     if [[ $(stat -c '%d:%i' /usr/sbin/policy-rc.d) != "$GUARD_ID" ]] || ! cmp -s /usr/sbin/policy-rc.d "$BACKUP/policy-rc.d.created"; then die 'Service guard changed externally.'; fi
     rm /usr/sbin/policy-rc.d; GUARD_ID=''
 }
@@ -288,7 +289,7 @@ ufw_files() {
 check_stock_ufw_controls() {
     local name template expected
     safe_root_path /var/lib/dpkg/info/ufw.md5sums
-    for name in before.rules before6.rules after.rules after6.rules before.init after.init; do
+    for name in before.rules before6.rules after.rules after6.rules user.rules user6.rules before.init after.init; do
         if [[ $name == *.rules ]]; then template=/usr/share/ufw/iptables/$name; else template=/usr/share/ufw/$name; fi
         safe_root_path "$template"
         expected=$(awk -v path="${template#/}" '$2==path {print $1}' /var/lib/dpkg/info/ufw.md5sums)
@@ -317,7 +318,6 @@ check_firewall() {
         nft -j list ruleset > "$BACKUP/nft-before.json"
         clean_nft < "$BACKUP/nft-before.json" || die 'Unknown native firewall; no rules changed.'
         ufw status | grep -Fxq 'Status: inactive' || die 'Unmanaged UFW is active.'
-        ! grep -Eq '^-A ' /etc/ufw/user.rules /etc/ufw/user6.rules || die 'Unmanaged stored UFW user rules exist.'
     fi
 }
 

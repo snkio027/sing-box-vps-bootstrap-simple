@@ -7,6 +7,16 @@
 服务端、Mac 客户端及测试脚本带有中文注释，说明执行顺序、权限、重复执行、失败处理与验证边界。
 注释版的改动与检查记录见 [注释与独立建仓记录](docs/commentary-validation.md)。
 
+## 主机初始化
+
+独立入口 [harden-vps.sh](scripts/harden-vps.sh) 分为 `prepare` 和 `apply`：准备密钥管理员后结束，
+操作者新建 SSH 会话并验证 sudo，再单独收紧认证、配置双栈 UFW 和每日安全更新。
+它保持现有 SSH 端口，授予明确选择的完整免密码管理员权限，允许更新引起短暂服务中断，禁止自动整机重启。
+使用与恢复见 [初始化说明](docs/hardening.md)，测试范围见 [验证记录](docs/hardening-validation.md)。
+
+新主机按初始化、下面的代理安装、私密客户端交接和链路/重启验证顺序部署。
+私密取回与完整组合部署仍待第二批，见 [开发计划](docs/next-steps.md)。
+
 ## 使用
 
 通过你已经验证主机指纹的 SSH/SFTP 连接，上传 `scripts/prepare-vps.sh`。在 VPS 上执行：
