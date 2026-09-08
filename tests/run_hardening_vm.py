@@ -258,7 +258,7 @@ ufw status | grep -Fxq 'Status: inactive'
             if mode == 'socket':
                 # A socket listener can remain healthy with its daemon stopped and /run/sshd gone.
                 # Reproduce the update handoff inside the existing session, then activate via systemd.
-                ssh("""sudo -n bash -s <<'READY'
+                observations['socket_recovery_output'] = ssh(r"""sudo -n bash -s <<'READY'
 source /usr/local/libexec/harden-vps.sh
 WORK=$(mktemp -d /run/hardening-ready.XXXXXXXX)
 BACKUP=$WORK
@@ -267,7 +267,9 @@ systemctl stop ssh.service
 systemctl is-active --quiet ssh.socket
 ! systemctl is-active --quiet ssh.service
 if /usr/sbin/sshd -t > "$WORK/stopped-check" 2>&1; then exit 1; fi
-grep -Fxq 'Missing privilege separation directory: /run/sshd' "$WORK/stopped-check"
+# OpenSSH log.c writes CRLF even to a redirected stderr file.
+tr -d '\r' < "$WORK/stopped-check" | grep -Fxq 'Missing privilege separation directory: /run/sshd'
+printf 'Confirmed stopped daemon lacks /run/sshd; activating via systemd.\n'
 ensure_ssh_ready_after_updates
 /usr/sbin/sshd -t
 SSH_PORT=22

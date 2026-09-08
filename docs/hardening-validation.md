@@ -30,6 +30,8 @@ CI 首轮 `bd9f321` 的默认 socket 和 service 两台 VM 都在启用 UFW 前�
 新管理员仍能建立连接。`ebafd61` 的诊断版再次复现，原始检查日志为
 `Missing privilege separation directory: /run/sshd`：更新后 socket 保持监听，但 daemon 的运行目录已移除。
 修正为由 systemd 激活原 daemon 后再检查，不手工创建目录或跳过语法验证；另加真实 socket-only 状态的回归用例。
+`0c3fd51` 的 socket 完整 apply 与新连接通过；附加回归用例的日志匹配没有处理
+OpenSSH stderr 的 CRLF 而失败，改为仅去除 CR 后精确匹配，原有状态和退出码断言保留。
 VM 当前正在执行修订版，首批整体结果未验收。复现命令（仅一次性 Linux 测试主机）：
 
 ```sh

@@ -38,6 +38,13 @@ The previous controller, schemas and ADRs are historical at commit
   security updates may restart necessary services and briefly interrupt access;
   automatic machine reboot remains forbidden. Keep prepare/apply separate.
 
+The minimal Mac client scope above applies to `scripts/connect-vps.sh`. The operator's
+separate, explicitly authorized daily deployment now uses fixed sing-box 1.14.0,
+root TUN and `org.sing-box` launchd at the paths documented in
+`docs/deployment-flow.md`. It has local HTTPS/restart evidence, but no generic Mac
+installer is shipped in this repository. Keep implementation, manual deployment
+steps and untested paths distinct when updating documentation.
+
 ## Execution boundaries
 
 - Repository changes and disposable CI/VM tests are authorized development work.
