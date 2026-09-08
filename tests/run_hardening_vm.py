@@ -141,6 +141,24 @@ runcmd:
             assertions.append(name)
             print('PASS ' + name, flush=True)
 
+        def reboot_guest(label):
+            old_boot = ssh('cat /proc/sys/kernel/random/boot_id', user=ADMIN).strip()
+            # One request per deliberately scheduled test reboot; never retry the mutation.
+            try:
+                ssh('sudo -n systemctl reboot', user=ADMIN, label=label)
+            except AssertionError:
+                assert executions[-1]['exit'] == 255
+            deadline = time.monotonic() + 180
+            while True:
+                try:
+                    new_boot = ssh('cat /proc/sys/kernel/random/boot_id', user=ADMIN, label='wait for new boot', timeout=15).strip()
+                    if new_boot != old_boot:
+                        return
+                except (AssertionError, subprocess.TimeoutExpired):
+                    pass
+                assert time.monotonic() < deadline, 'VM reboot recovery timed out'
+                time.sleep(3)
+
         prepare = f'bash {SCRIPT} prepare --admin {ADMIN} --public-key /root/operator.pub --ssh-port 22'
         apply = f'sudo -n --preserve-env=SSH_CONNECTION bash {SCRIPT} apply --admin {ADMIN} --ssh-port 22 --confirm-console'
         try:
@@ -219,10 +237,15 @@ for p in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.r
 done
 test ! -e /etc/ssh/sshd_config.d/00-sing-box-hardening.conf
 ufw status | grep -Fxq 'Status: inactive'
-rm /var/lib/sing-box-hardening/applying
 '''
             ssh(recovery, label='restore exact UFW files from ordinary backup')
             ssh('sudo -n true', user=ADMIN, label='new login after backup recovery')
+            # ufw disable intentionally leaves empty primary chains until reboot.
+            # Recover to the saved disabled policy, schedule a guest reboot, then recheck;
+            # do not flush the ruleset or teach the production entry to adopt unknown chains.
+            reboot_guest('controlled VM reboot after disabled-policy recovery')
+            ssh('sudo -n true; sudo -n ufw status | grep -Fxq "Status: inactive"', user=ADMIN)
+            ssh('rm /var/lib/sing-box-hardening/applying')
             passed('ordinary backup recovery preserves the administrator entry')
             ssh(apply, user=ADMIN, label='real apply', timeout=1800)
             ssh('test "$(id -un)" = fixtureadmin; test "$(sudo -n id -u)" = 0', user=ADMIN, label='new login after hardening')
@@ -263,22 +286,7 @@ AUDIT
                 return '\n'.join(re.sub(r'\[\d+:\d+\]', '[0:0]', line) for line in text.splitlines() if not line.startswith('#'))
             assert stable(before) == stable(after), 'Rerun changed key/groups/rules'
             passed('repeated prepare/apply retain key, groups and exact firewall rules')
-            old_boot = ssh('cat /proc/sys/kernel/random/boot_id', user=ADMIN).strip()
-            # Exactly one controlled reboot of this disposable guest, followed by fresh sessions.
-            try:
-                ssh('sudo -n systemctl reboot', user=ADMIN, label='controlled VM reboot')
-            except AssertionError:
-                assert executions[-1]['exit'] == 255
-            deadline = time.monotonic() + 180
-            while True:
-                try:
-                    new_boot = ssh('cat /proc/sys/kernel/random/boot_id', user=ADMIN, label='wait for new boot', timeout=15).strip()
-                    if new_boot != old_boot:
-                        break
-                except (AssertionError, subprocess.TimeoutExpired):
-                    pass
-                assert time.monotonic() < deadline, 'VM reboot recovery timed out'
-                time.sleep(3)
+            reboot_guest('controlled VM reboot after completed hardening')
             ssh(audit, user=ADMIN, label='post-reboot firewall/update persistence')
             ssh('sudo -n true; systemctl is-active --quiet ufw.service', user=ADMIN, label='post-reboot key and sudo')
             ssh('true', expected=255, label='post-reboot root denied')
