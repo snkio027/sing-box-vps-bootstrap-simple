@@ -290,7 +290,7 @@ AUDIT
             print(error, flush=True)
             # Do not export config/keys or the complete VM disk. Only selected diagnostic logs.
             try:
-                logs = ssh('sudo -n bash -c ' + shlex.quote('B=$(cat /var/lib/sing-box-hardening/last-backup); for n in dependency-install.log ufw-apply.log security-dry-run.log security-run.log; do test ! -f "$B/$n" || tail -n 30 "$B/$n"; done'), user=ADMIN, label='failure diagnostics')
+                logs = ssh('sudo -n bash -c ' + shlex.quote('B=$(cat /var/lib/sing-box-hardening/last-backup); for n in dependency-install.log ufw-apply.log security-dry-run.log security-run.log; do test ! -f "$B/$n" || tail -n 30 "$B/$n"; done; nft -j list ruleset; ufw status verbose'), user=ADMIN, label='failure diagnostics')
                 (output / 'diagnostics.log').write_text(logs)
             except Exception:
                 pass
