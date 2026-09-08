@@ -31,6 +31,9 @@ def main():
     os.umask(0o077)
     output = ROOT / 'artifacts' / ('hardening-vm-' + mode)
     output.mkdir(parents=True, exist_ok=True)
+    # Only sanitized summaries are placed here. The synthetic keys remain in work (0700).
+    output.parent.chmod(0o755)
+    output.chmod(0o755)
     assertions = []
     executions = []
     start = time.time()
@@ -115,7 +118,7 @@ runcmd:
                 '-o', 'ControlMaster=no', '-o', 'ControlPath=none', '-o', 'ConnectTimeout=8',
                 '-o', 'ServerAliveInterval=10', '-o', 'ServerAliveCountMax=3']
 
-        def ssh(cmd, *, user='root', expected=0, label='', timeout=120, auth='publickey'):
+        def ssh(cmd, *, user='root', expected=0, label='', timeout=120, auth='publickey', match=None):
             identity = work / ('bootstrap' if user == 'root' else 'admin')
             args = base + ['-i', str(identity), '-o', 'PreferredAuthentications=' + auth]
             if auth != 'publickey':
@@ -127,6 +130,8 @@ runcmd:
             if p.returncode != expected:
                 # All guest data is synthetic; output is bounded and never includes key file contents.
                 raise AssertionError(f'{label or cmd}: exit {p.returncode}, expected {expected}\n{p.stdout[-6000:]}\n{p.stderr[-6000:]}')
+            if match is not None:
+                assert match in p.stdout + p.stderr, f'{label}: missing expected error {match}\n{p.stdout}\n{p.stderr}'
             if auth != 'publickey':
                 assert 'Authentications that can continue: publickey' in p.stderr
                 assert 'Authentications that can continue: publickey,password' not in p.stderr
@@ -150,12 +155,15 @@ runcmd:
             ssh('test "$(cat /root/HARDENING_DISPOSABLE_VM)" = disposable-hardening-fixture; cloud-init status --wait >/dev/null')
             ssh('systemctl is-active --quiet ssh.' + ('socket' if mode == 'socket' else 'service'))
             passed('fresh external bootstrap SSH using ' + mode + ' listener and pinned host key')
-            ssh(prepare.replace('--ssh-port 22', '--ssh-port 2222'), expected=1, label='wrong input port')
+            firewall_facts = "for p in /etc/default/ufw /etc/ufw/*.rules; do test ! -f \"$p\" || sha256sum \"$p\"; done"
+            firewall_before = ssh(firewall_facts)
+            ssh(prepare.replace('--ssh-port 22', '--ssh-port 2222'), expected=1, label='wrong input port', match='differs')
             ssh('test ! -e /var/lib/sing-box-hardening; ! getent passwd fixtureadmin')
             # Effective config changes alone do not change the active socket/service listener.
             ssh("printf 'Port 2222\n' > /etc/ssh/sshd_config.d/01-fixture-port.conf")
-            ssh(prepare.replace('--ssh-port 22', '--ssh-port 2222'), expected=1, label='effective/actual port mismatch')
+            ssh(prepare.replace('--ssh-port 22', '--ssh-port 2222'), expected=1, label='effective/actual port mismatch', match='differs')
             ssh('rm /etc/ssh/sshd_config.d/01-fixture-port.conf; test ! -e /var/lib/sing-box-hardening')
+            assert ssh(firewall_facts) == firewall_before
             passed('wrong input and effective/listener mismatch fail before account/firewall writes')
             ssh("printf 'invalid\n' > /root/invalid.pub")
             ssh(prepare.replace('/root/operator.pub', '/root/invalid.pub'), expected=1, label='invalid public key')
@@ -173,12 +181,12 @@ runcmd:
             passed('fresh administrator key connection and full NOPASSWD sudo; root apply refused')
             # An earlier drop-in that defeats the candidate must stop before changing firewall.
             ssh("printf 'PasswordAuthentication yes\n' > /etc/ssh/sshd_config.d/00-before.conf")
-            ssh(apply, user=ADMIN, expected=1, label='ineffective SSH candidate')
+            ssh(apply, user=ADMIN, expected=1, label='ineffective SSH candidate', match='SSH policy cannot take effect')
             ssh('test ! -e /var/lib/sing-box-hardening/applying; rm /etc/ssh/sshd_config.d/00-before.conf')
             passed('SSH Include precedence conflict fails before firewall mutation')
             ssh('apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nftables >/dev/null', timeout=300)
             ssh("nft add table inet fixture_unknown; nft -j list ruleset > /root/nft-before.json")
-            ssh(apply, user=ADMIN, expected=1, label='unknown native firewall', timeout=600)
+            ssh(apply, user=ADMIN, expected=1, label='unknown native firewall', timeout=600, match='Unknown native firewall')
             ssh("nft -j list ruleset > /root/nft-after.json; cmp /root/nft-before.json /root/nft-after.json; test ! -e /var/lib/sing-box-hardening/applying; nft delete table inet fixture_unknown")
             passed('unknown native firewall is preserved and rejected')
             # Inject TERM immediately after real UFW configuration using a test-only wrapper.
@@ -288,6 +296,9 @@ test ! -e /usr/sbin/policy-rc.d
                                          for name in (*SOURCES, 'tests/run_hardening_vm.py', 'tests/fixtures/ubuntu-cloud-image.json')}}
             (output / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
             (output / 'result.log').write_text('\n'.join('PASS ' + s for s in assertions) + '\n' + error)
+            for name in ('summary.json', 'result.log', 'diagnostics.log'):
+                if (output / name).exists():
+                    (output / name).chmod(0o644)
     assert status == 'PASS', 'Hardening VM tests failed; see evidence.'
 
 

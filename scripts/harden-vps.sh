@@ -58,7 +58,7 @@ cleanup() {
     local code=$?
     # 只删除本次独占创建的服务启动保护文件，已有 policy-rc.d 直接拒绝，不接管。
     if [[ -n $GUARD_ID && -f /usr/sbin/policy-rc.d && ! -L /usr/sbin/policy-rc.d ]]; then
-        if [[ $(stat -c '%d:%i' /usr/sbin/policy-rc.d) == "$GUARD_ID" ]]; then rm /usr/sbin/policy-rc.d; fi
+        if [[ $(stat -c '%d:%i' /usr/sbin/policy-rc.d) == "$GUARD_ID" ]] && cmp -s /usr/sbin/policy-rc.d "$BACKUP/policy-rc.d.created"; then rm /usr/sbin/policy-rc.d; fi
     fi
     [[ -z $WORK ]] || rm -rf -- "$WORK"
     if (( code != 0 )) && [[ -n $BACKUP ]]; then
@@ -83,7 +83,7 @@ read_public_key() {
 # ss 的实际 TCP listener 与 sshd -T 必须一致。ssh.socket 活跃时还核对 systemd 的 Listen。
 # 这些检查先于包安装和防火墙修改；支持 service/socket 两种现有监听方式，拒绝多端口。
 check_listener_text() {
-    local expected=$1 socket_active=$2 endpoint processes port found=0 _
+    local expected=$1 socket_active=$2 endpoint processes port found=0 owner _
     while read -r _ _ _ endpoint _ processes; do
         [[ -n $endpoint ]] || continue
         port=${endpoint##*:}
@@ -94,6 +94,9 @@ check_listener_text() {
             if [[ $processes != *'"sshd"'* ]]; then
                 [[ $socket_active == yes && $processes == *'"systemd",pid=1,'* ]] || return 1
             fi
+            while read -r owner; do
+                [[ $owner == '"sshd",pid='* || ( $socket_active == yes && $owner == '"systemd",pid=1' ) ]] || return 1
+            done < <(grep -oE '"[^"]+",pid=[0-9]+' <<< "$processes")
             found=1
         fi
     done
@@ -247,12 +250,14 @@ install_dependencies() {
     fi
     safe_root_path /usr/sbin/policy-rc.d
     [[ ! -e /usr/sbin/policy-rc.d ]] || die 'Existing policy-rc.d requires operator inspection.'
-    (set -o noclobber; printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d)
+    printf '#!/bin/sh\n%s\nexit 101\n' "$MARKER" > "$BACKUP/policy-rc.d.created"
+    (set -o noclobber; cat "$BACKUP/policy-rc.d.created" > /usr/sbin/policy-rc.d)
     GUARD_ID=$(stat -c '%d:%i' /usr/sbin/policy-rc.d)
+    printf '%s\n' "$GUARD_ID" > "$BACKUP/policy-rc.d.identity"
     chmod 0755 /usr/sbin/policy-rc.d
     DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get -o DPkg::Lock::Timeout=120 update > "$BACKUP/dependency-update.log" 2>&1
     DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends jq nftables ufw unattended-upgrades needrestart > "$BACKUP/dependency-install.log" 2>&1
-    [[ $(stat -c '%d:%i' /usr/sbin/policy-rc.d) == "$GUARD_ID" ]] || die 'Service guard changed externally.'
+    if [[ $(stat -c '%d:%i' /usr/sbin/policy-rc.d) != "$GUARD_ID" ]] || ! cmp -s /usr/sbin/policy-rc.d "$BACKUP/policy-rc.d.created"; then die 'Service guard changed externally.'; fi
     rm /usr/sbin/policy-rc.d; GUARD_ID=''
 }
 
@@ -272,20 +277,35 @@ clean_nft() {
         ((.name=="INPUT" and .hook=="input") or (.name=="OUTPUT" and .hook=="output") or (.name=="FORWARD" and .hook=="forward")))
       else false end)' > /dev/null
 }
+clean_legacy() {
+    awk '/^#/ || NF==0 || /^COMMIT$/ || /^\*filter$/ || /^:(INPUT|OUTPUT|FORWARD) ACCEPT \[[0-9]+:[0-9]+\]$/ {next} {bad=1} END {exit bad}'
+}
 ufw_files() {
     printf '%s\n' /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/before.rules /etc/ufw/before6.rules \
-        /etc/ufw/after.rules /etc/ufw/after6.rules /etc/ufw/user.rules /etc/ufw/user6.rules /etc/ufw/sysctl.conf
+        /etc/ufw/after.rules /etc/ufw/after6.rules /etc/ufw/user.rules /etc/ufw/user6.rules /etc/ufw/sysctl.conf \
+        /etc/ufw/before.init /etc/ufw/after.init
+}
+check_stock_ufw_controls() {
+    local name template expected
+    safe_root_path /var/lib/dpkg/info/ufw.md5sums
+    for name in before.rules before6.rules after.rules after6.rules before.init after.init; do
+        if [[ $name == *.rules ]]; then template=/usr/share/ufw/iptables/$name; else template=/usr/share/ufw/$name; fi
+        safe_root_path "$template"
+        expected=$(awk -v path="${template#/}" '$2==path {print $1}' /var/lib/dpkg/info/ufw.md5sums)
+        [[ $expected =~ ^[0-9a-f]{32}$ && $(md5sum "$template" | cut -d ' ' -f 1) == "$expected" ]] || die 'UFW package template was modified.'
+        cmp -s "$template" "/etc/ufw/$name" || die 'Unmanaged UFW control rules or init hook differs from its package template.'
+    done
+    [[ ! -x /etc/ufw/before.init && ! -x /etc/ufw/after.init ]] || die 'Unmanaged executable UFW hook exists.'
 }
 check_firewall() {
     ! systemctl is-active --quiet nftables.service || die 'Another nftables service is active.'
     ! systemctl is-enabled --quiet nftables.service || die 'Another nftables boot policy is enabled.'
     local path command
     while read -r path; do safe_root_path "$path"; done < <(ufw_files)
-    for path in /etc/ufw/before.init /etc/ufw/after.init; do [[ ! -e $path ]] || die 'Unreviewed UFW init hook exists.'; done
     for command in iptables-legacy-save ip6tables-legacy-save; do
         if command -v "$command" >/dev/null; then
             "$command" > "$WORK/legacy"
-            ! grep -Eq '^-A |^:[^ ]+ (DROP|REJECT)' "$WORK/legacy" || die 'Legacy firewall rules exist.'
+            clean_legacy < "$WORK/legacy" || die 'Unknown legacy firewall exists.'
         fi
     done
     if [[ -f $STATE/applied ]]; then
@@ -293,6 +313,7 @@ check_firewall() {
         nft_snapshot > "$WORK/nft-current.json"
         cmp -s "$STATE/nft.json" "$WORK/nft-current.json" || die 'Managed kernel firewall changed externally.'
     else
+        check_stock_ufw_controls
         nft -j list ruleset > "$BACKUP/nft-before.json"
         clean_nft < "$BACKUP/nft-before.json" || die 'Unknown native firewall; no rules changed.'
         ufw status | grep -Fxq 'Status: inactive' || die 'Unmanaged UFW is active.'
@@ -404,6 +425,21 @@ verify_updates() {
         if ! systemctl is-enabled --quiet "$key" || ! systemctl is-active --quiet "$key"; then die 'Daily APT timer is not active/enabled.'; fi
     done
     cmp -s "$WORK/needrestart" "$RESTART_POLICY" || die 'Service restart policy changed.'
+    # 按 needrestart 的 Perl 配置加载方式检查最终 restart 值，识别后续片段覆盖。
+    # 仅解释现有 root 控制的配置，不运行进程扫描或服务重启。
+    safe_root_path /etc/needrestart/needrestart.conf
+    for key in /etc/needrestart/conf.d/*.conf; do [[ ! -e $key ]] || safe_root_path "$key"; done
+    /usr/bin/perl > "$WORK/restart-effective.log" 2>&1 <<'PERL' || die 'Effective needrestart policy is not automatic.'
+use strict;
+my %nrconf = (verbosity => 0);
+my $LOGPREF = '[hardening policy check]';
+open my $fh, '<', '/etc/needrestart/needrestart.conf' or die $!;
+my $config = do { local $/; <$fh> };
+eval $config;
+die $@ if $@;
+die "restart must be a" unless ($nrconf{restart} // '') eq 'a';
+print "restart=a\n";
+PERL
 }
 configure_updates() {
     render_updates > "$WORK/apt-policy"
@@ -437,6 +473,7 @@ EOF
 
 apply_hardening() {
     require_admin_session
+    [[ ! -e /usr/sbin/policy-rc.d && ! -L /usr/sbin/policy-rc.d ]] || die 'Existing service-start guard requires operator inspection before apply.'
     if [[ -f $STATE/applying && ! -f $STATE/applied ]]; then die 'Prior apply was interrupted; inspect last-backup and recover before retrying.'; fi
     if [[ -f $STATE/applied ]]; then sha256sum -c "$STATE/managed.sha256" > "$WORK/managed-check.log" 2>&1 || die 'Managed resources changed externally.'; fi
     prepare_ssh_candidate
@@ -468,6 +505,7 @@ apply_hardening() {
     check_ssh_port
     verify_firewall
     verify_updates
+    [[ ! -e /usr/sbin/policy-rc.d ]] || die 'An unexpected service-start guard remains.'
     while read -r path; do sha256sum "$path"; done < <(ufw_files) > "$STATE/ufw-files.sha256"
     nft_snapshot > "$STATE/nft.json"
     sha256sum "$SSH_POLICY" "$APT_POLICY" "$RESTART_POLICY" "/etc/sudoers.d/90-sing-box-$ADMIN" "/home/$ADMIN/.ssh/authorized_keys" > "$STATE/managed.sha256"

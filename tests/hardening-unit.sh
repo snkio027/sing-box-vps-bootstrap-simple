@@ -37,6 +37,9 @@ LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=120,fd=3))
 LISTEN 0 128 127.0.0.1:2222 0.0.0.0:* users:(("sshd",pid=120,fd=4))
 EOF
 reject check_listener_text 22 no </dev/null
+reject check_listener_text 22 no <<'EOF'
+LISTEN 0 128 *:22 *:* users:(("sshd",pid=120,fd=3),("foreign",pid=50,fd=4))
+EOF
 pass 'wrong, additional, absent and foreign listeners rejected'
 render_ssh_policy | grep -Fxq 'PermitRootLogin no'
 render_updates | grep -Fxq 'Unattended-Upgrade::Automatic-Reboot "false";'
@@ -59,6 +62,19 @@ else
     printf 'NOT RUN nft JSON tests: jq missing\n'
     exit 1
 fi
+clean_legacy <<'EOF'
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+COMMIT
+EOF
+reject clean_legacy <<'EOF'
+*filter
+:UNKNOWN - [0:0]
+COMMIT
+EOF
+pass 'unknown legacy chains rejected'
 # CLI 负向必须在 preflight 前失败；主进程绝不能运行实际安装路径。
 bash "$ROOT/scripts/harden-vps.sh" --help >/dev/null
 reject bash "$ROOT/scripts/harden-vps.sh" prepare --admin demo --ssh-port 22
