@@ -59,7 +59,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ssh-mode: [socket, service]
+        include:
+          - ssh-mode: socket
+            scenario: standard
+            artifact: hardening-vm-socket
+          - ssh-mode: service
+            scenario: standard
+            artifact: hardening-vm-service
+          - ssh-mode: socket
+            scenario: without-ufw
+            artifact: hardening-vm-socket-without-ufw
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -67,11 +76,11 @@ jobs:
       - name: Install disposable VM test tools
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils
       - name: Test separate preparation and hardening with fresh SSH sessions
-        run: sudo python3 -B tests/run_hardening_vm.py --ssh-mode '${{ matrix.ssh-mode }}'
+        run: sudo python3 -B tests/run_hardening_vm.py --ssh-mode '${{ matrix.ssh-mode }}' --scenario '${{ matrix.scenario }}'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: hardening-vm-${{ matrix.ssh-mode }}
-          path: artifacts/hardening-vm-${{ matrix.ssh-mode }}/
+          name: ${{ matrix.artifact }}
+          path: artifacts/${{ matrix.artifact }}/
           if-no-files-found: warn
           retention-days: 14

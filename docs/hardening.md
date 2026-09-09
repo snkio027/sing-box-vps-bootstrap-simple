@@ -6,7 +6,9 @@
 
 `prepare` 和 `apply` 必须分开调用。第一次只准备管理员并结束，第二次从新管理员的 SSH 会话调用。
 旧 SSH 会话和服务商控制台保持可用，直到收紧后的另一条全新连接通过。
-SSH 端口保持原值，TCP 443 留给代理；不支持同一主机多个 SSH 监听端口或非标准 Include 布局的自动接管。
+SSH 端口保持原值，TCP 443 留给代理；不支持同一主机多个 SSH 监听端口。SSH 配置只接受主文件中的一个未加引号的
+`Include /etc/ssh/sshd_config.d/*.conf` 和该目录下的平铺全局片段；任何 `Match`、嵌套/额外 Include
+或非规范关键字写法都会拒绝，包括只对其他来源生效的认证例外。
 
 ## 准备管理员
 
@@ -61,13 +63,16 @@ sudo --preserve-env=SSH_CONNECTION bash /usr/local/sbin/harden-vps.sh apply \
 
 1. 同时核对 `sshd -T`、`ss -ltnp` 的实际端口/所有者、活跃 `ssh.socket` 的 Listen。
    输入端口不符就停止，早于防火墙修改；不通过修改端口来迎合输入。
-2. 按现有 Include 顺序生成 SSH 候选，做语法和实际用户上下文检查。
-   不能生效的片段或不兼容的用户/组过滤策略会在 UFW 修改前被拒绝。
+2. 先限定完整 SSH 加载布局：拒绝任何 `Match`、嵌套/额外 Include，再按全局配置顺序生成候选。
+   原生 sshd 继续做语法和管理员/root 的有效配置检查；布局也在实际发布及更新后重新检查。
+   不通过枚举几个来源地址来推断所有来源都已安全。不能生效的片段或用户/组过滤冲突仍在 UFW 前拒绝。
 3. 建立普通私密备份；按需安装 jq、nftables、UFW、unattended-upgrades、needrestart。
    安装依赖期间临时阻止包脚本启动服务，保护文件只按本次身份和内容清理。
 4. 核查全部原生 nftables、legacy 防火墙、存储的 UFW 用户规则和控制文件。
    只在无未知规则时首次采用；UFW 默认控制文件必须与已安装包的原始模板一致。
    重跑时比较本项目保存的文件与内核规则摘要，发现外部变更就停止。
+   首次采用前，将依赖安装后、尚未修改的四份 UFW 配置保存到本次备份的 `ufw-before-apply/`，
+   记录 SHA-256、UFW 包版本和阶段说明，刷盘成功后才标记 applying 并修改规则。
 5. 先添加已核对的 SSH TCP 放行规则和 TCP 443 放行规则，再设置入站/转发拒绝、出站允许并启用双栈 UFW。
    保留默认网络控制规则；不 reset/flush 规则，不为改变 routed 显示文本启用内核转发。
 6. 发布 SSH 片段，再次校验真实配置，内容变化时 reload SSH；不关闭现有会话。
@@ -91,6 +96,7 @@ apply 返回成功表示本机检查通过。此时还要在另一个新终端�
 
 - 简单归属记录：`/var/lib/sing-box-hardening`，root 0700，保存管理员/端口/公钥和受管文件摘要。
 - 普通备份和有限日志：`/var/backups/sing-box-hardening/run.*`，root-only。
+  顶层文件及 `absent-before` 保留依赖安装前事实；`ufw-before-apply/` 为独立的安装后 UFW 恢复基线。
 - SSH：`/etc/ssh/sshd_config.d/00-sing-box-hardening.conf`。
 - sudo：`/etc/sudoers.d/90-sing-box-<管理员>`，0440。
 - 更新：`/etc/apt/apt.conf.d/99-sing-box-hardening` 与
@@ -106,7 +112,11 @@ apply 返回成功表示本机检查通过。此时还要在另一个新终端�
 - SSH 片段：若备份中存在原片段，只恢复该文件；若 `absent-before` 记录它原本不存在，
   先私密保存当前片段，再移出加载目录。执行 `sshd -t` 成功后 reload，验证全新连接。
 - 首次 UFW 采用：确认当前仍是本次规则且没有外部变更后，可以在恢复入口临时 `ufw disable`，
-  仅恢复备份中 `/etc/default/ufw`、`ufw.conf`、`user.rules`、`user6.rules` 对应文件。
+  先在本次 `ufw-before-apply/` 中执行 `sha256sum -c SHA256SUMS`，再恢复其中
+  `_etc_default_ufw`、`_etc_ufw_ufw.conf`、`_etc_ufw_user.rules`、`_etc_ufw_user6.rules` 四份文件
+  到对应的 `/etc/default/ufw` 和 `/etc/ufw/` 路径，保留模式与所有者，并逐份比较。
+  即使安装前四个文件均不存在，这一安装后基线也必须齐备。恢复会保留已安装的 UFW 和其他依赖，
+  不会将安装前的 absent-before 改写成“原本已存在”，也不宣称回到没有 UFW 包的全新系统。
   UFW 的 disable 会保留空主链和对应跳转直到下一次启动；恢复到原先的 disabled 策略后，
   在操作者明确安排的窗口重启，再核对新 SSH 与原生规则，才重试首次采用。
   不为了绕过检查全局清空规则，也不自动接管这些残留链。生产脚本本身不重启机器。

@@ -2,9 +2,29 @@
 
 本页只记录 `harden-vps.sh`，不把此前手工加固的真实 VPS 证据冒充新入口实测。
 
+## 2026-09-09 复审修订
+
+`8255939` 复审发现跨来源 SSH Match 例外未被拒绝，以及初始没有 UFW 时缺少恢复文件。
+下方旧 CI 证据只覆盖当时的用例，不代表这两条路径通过；第一批尚待本次修复复审。
+
+- SSH v1 限定为单层标准 Include 和全局配置，拒绝任何 Match、嵌套/额外 Include。
+  10 组本地测试已通过（Bash/ShellCheck/单元测试 exit 0）。
+- UFW 在依赖安装后、首次修改前单独保存四份恢复文件、摘要、包版本和阶段说明，安装前记录仍保留。
+- VM 增加真实 sshd 的跨来源反例和嵌套 Include 拒绝用例；独立 `without-ufw` 场景在任何脚本调用前
+  用 dpkg purge 构造并核对包及四份文件均不存在，第一次 apply 即注入 UFW 后中断。
+  该场景恢复后保留依赖包，继续验证重试、重复执行和重启，不复用标准场景提前安装依赖的状态。
+
+本轮新增 VM 场景：**NOT RUN**，等待 CI 实跑。新增复现命令：
+
+```sh
+sudo python3 -B tests/run_hardening_vm.py --ssh-mode socket --scenario without-ufw
+```
+
+## 先前实现的测试记录
+
 已验证的实现提交：[46bf541](https://github.com/snkio027/sing-box-vps-bootstrap-simple/commit/46bf541b67b5b42d6e88917b1db12714a649e1a0)。
 [本轮 CI](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34234154464) 的静态、Mac、原安装器 VM 和两套加固 VM 全部通过。
-第一批实现验证 **PASS，待独立评审**；不等于真实 VPS 或完整组合部署验收。
+当时执行的测试通过；后续复审发现上面列出的覆盖缺口，不能作为第一批最终验收。
 
 | 加固 VM | 断言组 | SSH 命令记录 | 驱动退出码 |
 | --- | ---: | ---: | ---: |

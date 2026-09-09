@@ -34,6 +34,9 @@ The previous controller, schemas and ADRs are historical at commit
   Verify the input SSH port against effective sshd config, actual listeners and
   active ssh.socket before firewall writes; add the verified SSH allow rule before
   enabling restrictive defaults. Refuse incompatible target accounts/unknown rules.
+  v1 refuses SSH Match and nested/extra Include layouts before UFW writes. Capture
+  a separate post-dependency, pre-UFW recovery baseline, preserving the original
+  pre-install files/absence record; recovery retains newly installed dependencies.
 - Hardening deliberately grants full NOPASSWD administrator elevation. Daily
   security updates may restart necessary services and briefly interrupt access;
   automatic machine reboot remains forbidden. Keep prepare/apply separate.

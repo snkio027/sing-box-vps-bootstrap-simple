@@ -269,6 +269,30 @@ install_dependencies() {
     rm /usr/sbin/policy-rc.d; GUARD_ID=''
 }
 
+# 这是依赖安装后的回滚基线，不覆盖 make_backup 的安装前文件/absent-before。
+# 初始未安装 UFW 时也必须有四份可恢复配置；恢复会保留新安装的依赖包。
+backup_ufw_before_apply() {
+    [[ ! -f $STATE/applied ]] || return 0
+    local path name directory="$BACKUP/ufw-before-apply"
+    mkdir -m 0700 "$directory"
+    for path in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
+        safe_root_path "$path"
+        [[ -f $path ]] || die 'UFW recovery baseline file is missing.'
+        name=${path//\//_}
+        cp --preserve=mode,ownership "$path" "$directory/$name"
+        (cd "$directory" && sha256sum "$name") >> "$directory/SHA256SUMS"
+    done
+    dpkg-query -W -f='${binary:Package} ${Version} ${db:Status-Status}\n' ufw > "$directory/package.txt"
+    cat > "$directory/README" <<'EOF'
+POST_DEPENDENCIES_PRE_UFW: captured after dependency installation and firewall checks,
+before any UFW policy write. Restore these four files to the disabled pre-apply policy.
+The parent backup and absent-before describe the earlier, pre-dependency state.
+Installed packages remain installed; this is not a return to a package-absent system.
+Verify SHA256SUMS before recovery. See docs/hardening.md for the controlled reboot step.
+EOF
+    sync -f "$directory"
+}
+
 # 全量 nft JSON；去掉 handle、计数器等易变观测，保留全部规则/集合/链与顺序。
 nft_snapshot() {
     nft -j list ruleset | jq -S 'del(.nftables[] | select(has("metainfo"))) |
@@ -331,8 +355,42 @@ check_firewall() {
 render_ssh_policy() {
     printf '%s\nPermitRootLogin no\nPubkeyAuthentication yes\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nAuthenticationMethods publickey\n' "$MARKER"
 }
+
+# v1 只接受一个标准 Include 与平铺的全局片段，不尝试枚举所有 Match 来源。
+# 关键字不区分大小写；引号/等号/转义等非规范关键字写法一律拒绝，而非漏扫。
+# 参数仍由 sshd 原生解析；此函数只限定加载布局，不复制 OpenSSH 的配置解释器。
+check_ssh_layout_text() {
+    awk -v main="$1" '
+      {
+        line=$0; sub(/\r$/, "", line); sub(/^[ \t]+/, "", line)
+        if (line=="" || line ~ /^#/) next
+        if (line !~ /^[A-Za-z][A-Za-z0-9]*[ \t]+/) {bad=1; next}
+        key=line; sub(/[ \t].*$/, "", key); key=tolower(key)
+        if (key=="match") bad=1
+        if (key=="include") {
+          value=line; sub(/^[^ \t]+[ \t]+/, "", value); sub(/[ \t]+$/, "", value)
+          includes++
+          if (main!=1 || value!="/etc/ssh/sshd_config.d/*.conf" || includes!=1) bad=1
+        }
+      }
+      END {exit (bad || (main==1 && includes!=1))}'
+}
+check_ssh_layout() {
+    local path
+    safe_root_path /etc/ssh/sshd_config
+    check_ssh_layout_text 1 < /etc/ssh/sshd_config || die 'Unsupported SSH layout: Match or noncanonical/extra Include.'
+    safe_root_path /etc/ssh/sshd_config.d
+    for path in /etc/ssh/sshd_config.d/*.conf; do
+        [[ -e $path || -L $path ]] || continue
+        safe_root_path "$path"
+        [[ -f $path ]] || die 'SSH fragment must be a regular file.'
+        check_ssh_layout_text 0 < "$path" || die 'Unsupported SSH layout: Match, nested Include or noncanonical directive.'
+    done
+}
 check_effective_ssh() {
     local file=$1 user settings setting
+    # 候选、实际发布及更新后的检查都重新限定完整加载树，不只检查当前连接来源。
+    check_ssh_layout
     /usr/sbin/sshd -t -f "$file" > "$WORK/ssh-candidate-check.log" 2>&1 || die 'SSH candidate failed syntax check.'
     for user in "$ADMIN" root; do
         settings=$(/usr/sbin/sshd -T -f "$file" -C "user=$user,$SSH_CONTEXT")
@@ -347,12 +405,11 @@ check_effective_ssh() {
     done
 }
 prepare_ssh_candidate() {
-    safe_root_path /etc/ssh/sshd_config
+    check_ssh_layout
     safe_root_path "$SSH_POLICY"
     render_ssh_policy > "$WORK/ssh-policy"
     if [[ -e $SSH_POLICY ]]; then cmp -s "$WORK/ssh-policy" "$SSH_POLICY" || die 'Conflicting hardening SSH file.'; fi
-    # 保持真实主配置的顺序和 Match，只有标准 Include 目录换成候选快照目录。
-    grep -Eq '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config.d/\*\.conf[[:space:]]*$' /etc/ssh/sshd_config || die 'Expected standard Ubuntu SSH Include.'
+    # 布局已经限定；保持全局配置顺序，只将标准 Include 换成候选快照目录。
     install -d -m 0700 "$WORK/sshd_config.d"
     local path
     for path in /etc/ssh/sshd_config.d/*.conf; do
@@ -497,6 +554,7 @@ apply_hardening() {
     install_dependencies
     check_ssh_port
     check_firewall
+    backup_ufw_before_apply
     # 已有 APT/needrestart 同名片段必须兼容，不能在 SSH/UFW 之后才发现冲突。
     render_updates > "$WORK/apt-policy"
     render_restart_policy > "$WORK/needrestart"

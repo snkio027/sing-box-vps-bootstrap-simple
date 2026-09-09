@@ -26,10 +26,13 @@ def run(args, **kwargs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ssh-mode', choices=('socket', 'service'), required=True)
-    mode = parser.parse_args().ssh_mode
+    parser.add_argument('--scenario', choices=('standard', 'without-ufw'), default='standard')
+    args = parser.parse_args()
+    mode, scenario = args.ssh_mode, args.scenario
     assert os.geteuid() == 0, 'Only the disposable Linux VM runner uses root.'
     os.umask(0o077)
-    output = ROOT / 'artifacts' / ('hardening-vm-' + mode)
+    suffix = '-without-ufw' if scenario == 'without-ufw' else ''
+    output = ROOT / 'artifacts' / ('hardening-vm-' + mode + suffix)
     output.mkdir(parents=True, exist_ok=True)
     # Only sanitized summaries are placed here. The synthetic keys remain in work (0700).
     output.parent.chmod(0o755)
@@ -175,6 +178,20 @@ runcmd:
             ssh('systemctl is-active --quiet ssh.' + ('socket' if mode == 'socket' else 'service'))
             observations['guest_environment'] = ssh('uname -srv; cat /etc/os-release; python3 --version; bash --version | head -n 1')
             passed('fresh external bootstrap SSH using ' + mode + ' listener and pinned host key')
+            absent_ufw = r'''set -eu
+! dpkg-query -W -f='${db:Status-Status}' ufw 2>/dev/null | grep -Fxq installed
+! command -v ufw
+for p in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
+  test ! -e "$p"
+done
+test ! -e /var/lib/sing-box-hardening/last-backup
+printf 'UFW package/command and all four configuration files absent; no prior apply backup.\n'
+'''
+            if scenario == 'without-ufw':
+                # Construct this starting condition only in the disposable guest, before any entry invocation.
+                ssh('DEBIAN_FRONTEND=noninteractive dpkg --purge ufw', label='construct package-absent VM starting state')
+                observations['initial_ufw_state'] = ssh(absent_ufw, label='prove UFW absent before first prepare/apply')
+                passed('initial UFW package and four files absent before any hardening invocation')
             firewall_facts = "for p in /etc/default/ufw /etc/ufw/*.rules; do test ! -f \"$p\" || sha256sum \"$p\"; done"
             firewall_before = ssh(firewall_facts)
             ssh(prepare.replace('--ssh-port 22', '--ssh-port 2222'), expected=1, label='wrong input port', match='differs')
@@ -197,22 +214,55 @@ runcmd:
             ssh('test ! -e /etc/ssh/sshd_config.d/00-sing-box-hardening.conf; test ! -e /var/lib/sing-box-hardening/applied')
             passed('prepare is separate, preserves SSH policy and permits unrelated existing account')
             ssh('test "$(id -un)" = fixtureadmin; test "$(sudo -n id -u)" = 0', user=ADMIN, label='fresh administrator key and sudo')
-            ssh('bash ' + SCRIPT + ' apply --admin fixtureadmin --ssh-port 22 --confirm-console', expected=1, label='root session apply rejected')
-            passed('fresh administrator key connection and full NOPASSWD sudo; root apply refused')
-            # An earlier drop-in that defeats the candidate must stop before changing firewall.
-            ssh("printf 'PasswordAuthentication yes\n' > /etc/ssh/sshd_config.d/00-before.conf")
-            ssh(apply, user=ADMIN, expected=1, label='ineffective SSH candidate', match='SSH policy cannot take effect')
-            ssh('test ! -e /var/lib/sing-box-hardening/applying; rm /etc/ssh/sshd_config.d/00-before.conf')
-            passed('SSH Include precedence conflict fails before firewall mutation')
-            ssh('apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nftables >/dev/null', timeout=300)
-            ssh("nft add table inet fixture_unknown; nft -j list ruleset > /root/nft-before.json")
-            ssh(apply, user=ADMIN, expected=1, label='unknown native firewall', timeout=600, match='Unknown native firewall')
-            ssh("nft -j list ruleset > /root/nft-after.json; cmp /root/nft-before.json /root/nft-after.json; test ! -e /var/lib/sing-box-hardening/applying; nft delete table inet fixture_unknown")
-            passed('unknown native firewall is preserved and rejected')
-            ssh('cp /etc/ufw/user.rules /root/fixture-user.rules; cp /etc/ufw/user6.rules /root/fixture-user6.rules; ufw allow 12345/tcp >/dev/null; sha256sum /etc/ufw/user.rules /etc/ufw/user6.rules > /root/fixture-custom.sha256')
-            ssh(apply, user=ADMIN, expected=1, label='unknown stored UFW rule', match='Unmanaged UFW control')
-            ssh('sha256sum -c /root/fixture-custom.sha256 >/dev/null; cp /root/fixture-user.rules /etc/ufw/user.rules; cp /root/fixture-user6.rules /etc/ufw/user6.rules')
-            passed('stored custom UFW rules are refused and preserved')
+            passed('fresh administrator key connection and full NOPASSWD sudo')
+            if scenario == 'standard':
+                ssh('bash ' + SCRIPT + ' apply --admin fixtureadmin --ssh-port 22 --confirm-console', expected=1, label='root session apply rejected')
+                passed('root apply refused before mutation')
+                # An earlier drop-in that defeats the candidate must stop before changing firewall.
+                ssh("printf 'PasswordAuthentication yes\n' > /etc/ssh/sshd_config.d/00-before.conf")
+                ssh(apply, user=ADMIN, expected=1, label='ineffective SSH candidate', match='SSH policy cannot take effect')
+                ssh('test ! -e /var/lib/sing-box-hardening/applying; rm /etc/ssh/sshd_config.d/00-before.conf')
+                passed('SSH Include precedence conflict fails before firewall mutation')
+                ssh('cp /etc/ssh/sshd_config /root/fixture-sshd-main')
+                ssh("printf '\\nMatch Address 203.0.113.0/24\\n PermitRootLogin yes\\n PasswordAuthentication yes\\n AuthenticationMethods any\\n' >> /etc/ssh/sshd_config")
+                observations['match_counterexample'] = ssh(r'''set -eu
+source /usr/local/libexec/harden-vps.sh
+D=$(mktemp -d /run/hardening-match.XXXXXXXX)
+trap 'rm -rf "$D"' EXIT
+{ render_ssh_policy; cat /etc/ssh/sshd_config; } > "$D/candidate"
+/usr/sbin/sshd -t -f "$D/candidate"
+read -r peer peerport localip localport <<< "$SSH_CONNECTION"
+for user in fixtureadmin root; do
+  /usr/sbin/sshd -T -f "$D/candidate" -C "user=$user,host=$peer,addr=$peer,laddr=$localip,lport=$localport" > "$D/current"
+  grep -Fxq 'permitrootlogin no' "$D/current"
+  grep -Fxq 'passwordauthentication no' "$D/current"
+  grep -Fxq 'authenticationmethods publickey' "$D/current"
+done
+/usr/sbin/sshd -T -f "$D/candidate" -C "user=root,host=203.0.113.5,addr=203.0.113.5,laddr=$localip,lport=$localport" > "$D/other"
+grep -Fxq 'permitrootlogin yes' "$D/other"
+grep -Fxq 'passwordauthentication yes' "$D/other"
+grep -Fxq 'authenticationmethods any' "$D/other"
+printf 'Real sshd: current-source administrator/root secure; other source permits root/password/any.\n'
+''', label='real sshd cross-source Match counterexample')
+                before_match = ssh(firewall_facts)
+                ssh(apply, user=ADMIN, expected=1, label='reject other-source Match before UFW', match='Unsupported SSH layout')
+                assert ssh(firewall_facts) == before_match
+                ssh('test ! -e /var/lib/sing-box-hardening/last-backup; test ! -e /var/lib/sing-box-hardening/applying; cp /root/fixture-sshd-main /etc/ssh/sshd_config')
+                passed('other-source authentication exception rejected before dependency/firewall writes')
+                ssh("printf 'LogLevel INFO\\n' > /root/fixture-nested-ssh.conf; printf 'iNcLuDe /root/fixture-nested-ssh.conf\\n' > /etc/ssh/sshd_config.d/70-fixture-nested.conf; /usr/sbin/sshd -t")
+                ssh(apply, user=ADMIN, expected=1, label='reject nested Include before UFW', match='Unsupported SSH layout')
+                assert ssh(firewall_facts) == before_match
+                ssh('test ! -e /var/lib/sing-box-hardening/last-backup; rm /etc/ssh/sshd_config.d/70-fixture-nested.conf /root/fixture-nested-ssh.conf')
+                passed('native-valid nested Include rejected before dependency/firewall writes')
+                ssh('apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends nftables >/dev/null', timeout=300)
+                ssh("nft add table inet fixture_unknown; nft -j list ruleset > /root/nft-before.json")
+                ssh(apply, user=ADMIN, expected=1, label='unknown native firewall', timeout=600, match='Unknown native firewall')
+                ssh("nft -j list ruleset > /root/nft-after.json; cmp /root/nft-before.json /root/nft-after.json; test ! -e /var/lib/sing-box-hardening/applying; nft delete table inet fixture_unknown")
+                passed('unknown native firewall is preserved and rejected')
+                ssh('cp /etc/ufw/user.rules /root/fixture-user.rules; cp /etc/ufw/user6.rules /root/fixture-user6.rules; ufw allow 12345/tcp >/dev/null; sha256sum /etc/ufw/user.rules /etc/ufw/user6.rules > /root/fixture-custom.sha256')
+                ssh(apply, user=ADMIN, expected=1, label='unknown stored UFW rule', match='Unmanaged UFW control')
+                ssh('sha256sum -c /root/fixture-custom.sha256 >/dev/null; cp /root/fixture-user.rules /etc/ufw/user.rules; cp /root/fixture-user6.rules /etc/ufw/user6.rules')
+                passed('stored custom UFW rules are refused and preserved')
             # Inject TERM immediately after real UFW configuration using a test-only wrapper.
             # Production entry has no fault/debug flags. SSH policy has not yet been published.
             wrapper = f'''#!/usr/bin/bash
@@ -222,31 +272,60 @@ configure_firewall() {{ real_configure_firewall; kill -TERM "$$"; }}
 main "$@"
 '''
             ssh("printf %s " + shlex.quote(wrapper) + ' > /usr/local/libexec/fixture-interrupt.sh')
+            if scenario == 'without-ufw':
+                ssh(absent_ufw, label='prove package absence immediately before first interrupted apply')
+                assert not any(f'bash {SCRIPT} apply ' in c['command'] or 'fixture-interrupt.sh apply ' in c['command'] for c in executions), 'Unexpected prior apply in package-absent scenario'
             ssh(apply.replace(SCRIPT, '/usr/local/libexec/fixture-interrupt.sh'), user=ADMIN, expected=143, label='TERM after UFW', timeout=600)
             ssh('test ! -e /etc/ssh/sshd_config.d/00-sing-box-hardening.conf; test -f /var/lib/sing-box-hardening/applying')
+            observations['ufw_recovery_baseline'] = ssh(r'''set -eu
+B=$(cat /var/lib/sing-box-hardening/last-backup)
+D="$B/ufw-before-apply"
+test "$(stat -c '%U:%a' "$D")" = root:700
+(cd "$D" && sha256sum -c SHA256SUMS)
+grep -Fxq 'ENABLED=no' "$D/_etc_ufw_ufw.conf"
+grep -q '^POST_DEPENDENCIES_PRE_UFW:' "$D/README"
+cat "$D/package.txt"
+''', label='verify durable post-dependency UFW baseline before recovery')
+            if scenario == 'without-ufw':
+                ssh(r'''set -eu
+B=$(cat /var/lib/sing-box-hardening/last-backup)
+for p in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
+  name=$(printf %s "$p" | tr / _)
+  grep -Fxq "$p" "$B/absent-before"
+  test ! -e "$B/$name"
+  test -f "$B/ufw-before-apply/$name"
+done
+''', label='preserve original absence separately from four recovery files')
+                passed('first interrupted apply installs UFW and retains both original absence and recoverable baseline')
+
             ssh('sudo -n true', user=ADMIN, label='new login after interrupted apply')
             ssh(apply, user=ADMIN, expected=1, label='interrupted apply refuses blind retry')
             passed('interruption retains new SSH access and recovery record; blind retry refused')
             # Explicit operator-style recovery only of known fixture files; no global rule flush.
             recovery = '''set -eu
 B=$(cat /var/lib/sing-box-hardening/last-backup)
-test -d "$B"
+D="$B/ufw-before-apply"
+test -d "$D"
+(cd "$D" && sha256sum -c SHA256SUMS)
 ufw disable >/dev/null
 for p in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
   name=$(printf %s "$p" | tr / _)
-  test -f "$B/$name"
-  cp --preserve=mode,ownership "$B/$name" "$p"
+  test -f "$D/$name"
+  cp --preserve=mode,ownership "$D/$name" "$p"
+  cmp "$D/$name" "$p"
 done
 test ! -e /etc/ssh/sshd_config.d/00-sing-box-hardening.conf
 ufw status | grep -Fxq 'Status: inactive'
 '''
-            ssh(recovery, label='restore exact UFW files from ordinary backup')
+            ssh(recovery, label='restore exact UFW files from post-dependency baseline')
             ssh('sudo -n true', user=ADMIN, label='new login after backup recovery')
             # ufw disable intentionally leaves empty primary chains until reboot.
             # Recover to the saved disabled policy, schedule a guest reboot, then recheck;
             # do not flush the ruleset or teach the production entry to adopt unknown chains.
             reboot_guest('controlled VM reboot after disabled-policy recovery')
             ssh('sudo -n true; sudo -n ufw status | grep -Fxq "Status: inactive"', user=ADMIN)
+            if scenario == 'without-ufw':
+                ssh("dpkg-query -W -f='${db:Status-Status}' ufw | grep -Fxq installed", label='recovery retains installed UFW dependency')
             ssh('rm /var/lib/sing-box-hardening/applying')
             passed('ordinary backup recovery preserves the administrator entry')
             observations['apply_output'] = ssh(apply, user=ADMIN, label='real apply', timeout=1800)
@@ -334,7 +413,7 @@ AUDIT
             except subprocess.TimeoutExpired:
                 vm.kill(); vm.wait(timeout=10)
             summary = {'result': status, 'exit_code': 0 if status == 'PASS' else 1,
-                       'ssh_mode': mode, 'memory_mib': 1024, 'disk_bytes': 20 * 1024**3,
+                       'ssh_mode': mode, 'scenario': scenario, 'memory_mib': 1024, 'disk_bytes': 20 * 1024**3,
                        'architecture': 'amd64', 'acceleration': acceleration,
                        'elapsed_seconds': round(time.time() - start), 'assertions': assertions,
                        'commands': executions, 'observations': observations, 'failure': error, 'real_vps': 'NOT RUN',

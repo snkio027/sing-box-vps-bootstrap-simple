@@ -41,6 +41,34 @@ reject check_listener_text 22 no <<'EOF'
 LISTEN 0 128 *:22 *:* users:(("sshd",pid=120,fd=3),("foreign",pid=50,fd=4))
 EOF
 pass 'wrong, additional, absent and foreign listeners rejected'
+check_ssh_layout_text 1 <<'EOF'
+# Match and Include inside comments are harmless.
+Include /etc/ssh/sshd_config.d/*.conf
+PermitRootLogin prohibit-password
+Subsystem sftp /usr/lib/openssh/sftp-server
+EOF
+check_ssh_layout_text 0 <<'EOF'
+  # Match Address 203.0.113.0/24
+PasswordAuthentication no
+Banner "/a path/including Match and Include"
+EOF
+pass 'single-level SSH layout with global options accepted'
+for line in 'Match Address 203.0.113.0/24' 'mAtCh all' $'\tMATCH\tUser root\r' \
+    'Match=Address 203.0.113.0/24' '"Match" Address 203.0.113.0/24' \
+    'Include /etc/ssh/sshd_config.d/*.conf' 'iNcLuDe /root/other.conf'; do
+    reject check_ssh_layout_text 0 <<< "$line"
+done
+reject check_ssh_layout_text 1 <<'EOF'
+Include /etc/ssh/sshd_config.d/*.conf
+Include /etc/ssh/sshd_config.d/*.conf
+EOF
+reject check_ssh_layout_text 1 <<'EOF'
+Include /root/another/*.conf
+EOF
+reject check_ssh_layout_text 1 <<'EOF'
+PermitRootLogin no
+EOF
+pass 'Match, disguised keywords, nested/extra and noncanonical Includes rejected'
 render_ssh_policy | grep -Fxq 'PermitRootLogin no'
 render_updates | grep -Fxq 'Unattended-Upgrade::Automatic-Reboot "false";'
 # Perl 变量必须保留字面量。
