@@ -5,7 +5,7 @@
 ## 2026-09-09 复审修订
 
 `8255939` 复审发现跨来源 SSH Match 例外未被拒绝，以及初始没有 UFW 时缺少恢复文件。
-下方旧 CI 证据只覆盖当时的用例，不代表这两条路径通过；第一批尚待本次修复复审。
+下方旧 CI 证据只覆盖当时的用例，不代表这两条路径通过；本次修复已在 `d000432` 针对性复审中通过，P1、P2 闭合。
 
 - SSH v1 限定为单层标准 Include 和全局配置，拒绝任何 Match、嵌套/额外 Include。
   10 组本地测试已通过（Bash/ShellCheck/单元测试 exit 0）。
@@ -32,8 +32,9 @@ Ubuntu OpenSSH 9.6 在已有全局 `AuthenticationMethods publickey` 后解析 M
 | ssh.service，standard | 17 | 74 | 0 |
 | 默认 ssh.socket，without-ufw | 14 | 61 | 0 |
 
-三套共 49 组断言、212 条 SSH 命令记录。9 次受控重启期间的短暂 exit 255 单独记录，
-其余退出码全部符合预期；包括布局拒绝的 exit 1、UFW 后 TERM 的 exit 143 和禁止认证的 exit 255。
+三套共 49 组断言、212 条 SSH 命令记录。每台 VM 安排两次受控重启，共 **6 次重启**；
+加上三台 VM 的初始开机，共 9 次启动。该测试提交的记录另含 **9 条重启轮询期间的短暂 exit 255**，
+这是断连记录条数，不是重启次数。其余退出码全部符合预期；包括布局拒绝的 exit 1、UFW 后 TERM 的 exit 143 和禁止认证的 exit 255。
 环境为 Ubuntu 24.04.4 amd64、KVM、1 GiB / 20 GiB、2 vCPU，初始内核 6.8.0-138-generic，
 Bash 5.2.21、Python 3.12.3。本轮未操作真实 VPS 或本机网络。
 
@@ -60,7 +61,8 @@ sudo python3 -B tests/run_hardening_vm.py --ssh-mode socket --scenario without-u
 ```
 
 制品分别为 `hardening-vm-socket`、`hardening-vm-service` 和 `hardening-vm-socket-without-ufw`，
-保留 14 天。本轮修复实现与上述测试已完成，仍待针对性复审；未自行合并 PR。
+保留 14 天。本轮修复实现与上述测试已完成；用户针对 `d000432` 的复审通过，允许合并。
+该文档提交的[六项 CI 也全部成功](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34349644277)。
 真实 VPS 新入口、私密导出、完整组合部署和 arm64 VM 仍为 **NOT RUN**。
 
 ## 先前实现的测试记录
