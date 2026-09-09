@@ -224,7 +224,9 @@ printf 'UFW package/command and all four configuration files absent; no prior ap
                 ssh('test ! -e /var/lib/sing-box-hardening/applying; rm /etc/ssh/sshd_config.d/00-before.conf')
                 passed('SSH Include precedence conflict fails before firewall mutation')
                 ssh('cp /etc/ssh/sshd_config /root/fixture-sshd-main')
-                ssh("printf '\\nMatch Address 203.0.113.0/24\\n PermitRootLogin yes\\n PasswordAuthentication yes\\n AuthenticationMethods any\\n' >> /etc/ssh/sshd_config")
+                # OpenSSH 9.6 rejects 'any' after a global method even inside Match;
+                # use its valid explicit password override to reproduce the source-dependent hole.
+                ssh("printf '\\nMatch Address 203.0.113.0/24\\n PermitRootLogin yes\\n PasswordAuthentication yes\\n AuthenticationMethods password\\n' >> /etc/ssh/sshd_config")
                 observations['match_counterexample'] = ssh(r'''set -eu
 source /usr/local/libexec/harden-vps.sh
 D=$(mktemp -d /run/hardening-match.XXXXXXXX)
@@ -241,8 +243,8 @@ done
 /usr/sbin/sshd -T -f "$D/candidate" -C "user=root,host=203.0.113.5,addr=203.0.113.5,laddr=$localip,lport=$localport" > "$D/other"
 grep -Fxq 'permitrootlogin yes' "$D/other"
 grep -Fxq 'passwordauthentication yes' "$D/other"
-grep -Fxq 'authenticationmethods any' "$D/other"
-printf 'Real sshd: current-source administrator/root secure; other source permits root/password/any.\n'
+grep -Fxq 'authenticationmethods password' "$D/other"
+printf 'Real sshd: current-source administrator/root secure; other source permits root/password authentication.\n'
 ''', label='real sshd cross-source Match counterexample')
                 before_match = ssh(firewall_facts)
                 ssh(apply, user=ADMIN, expected=1, label='reject other-source Match before UFW', match='Unsupported SSH layout')
