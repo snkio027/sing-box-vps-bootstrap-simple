@@ -14,11 +14,54 @@
   用 dpkg purge 构造并核对包及四份文件均不存在，第一次 apply 即注入 UFW 后中断。
   该场景恢复后保留依赖包，继续验证重试、重复执行和重启，不复用标准场景提前安装依赖的状态。
 
-本轮新增 VM 场景：**NOT RUN**，等待 CI 实跑。新增复现命令：
+首轮修订 `23489ab` 的独立 `without-ufw` VM 通过 14 组断言（exit 0）；两套标准 VM
+停在新增反例的构造阶段，尚未执行本轮 SSH 拒绝断言，不能计为通过。
+Ubuntu OpenSSH 9.6 在已有全局 `AuthenticationMethods publickey` 后解析 Match 内的 `any` 时
+报 `"any" must appear alone`（sshd exit 255）。这与[该版本解析实现](https://github.com/openssh/openssh-portable/blob/V_9_6_P1/servconf.c#L2308)
+一致；用例改为显式的 `AuthenticationMethods password`，继续要求真实语法通过、当前来源关闭认证、
+另一来源允许 root 密码认证。没有放宽生产检查或忽略失败。
+[首轮 CI 与失败制品](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34348174852)保留原始结果。
+
+本轮测试提交：[7a61f63](https://github.com/snkio027/sing-box-vps-bootstrap-simple/commit/7a61f63c9433830a840a82b22af8593c2f6f1f23)。
+[CI 六个任务全部通过](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34348853016)，
+包括静态、Mac 配置、原安装器 VM 和下列三套加固 VM。
+
+| 加固 VM | 断言组 | SSH 命令记录 | 驱动退出码 |
+| --- | ---: | ---: | ---: |
+| 默认 ssh.socket，standard | 18 | 77 | 0 |
+| ssh.service，standard | 17 | 74 | 0 |
+| 默认 ssh.socket，without-ufw | 14 | 61 | 0 |
+
+三套共 49 组断言、212 条 SSH 命令记录。9 次受控重启期间的短暂 exit 255 单独记录，
+其余退出码全部符合预期；包括布局拒绝的 exit 1、UFW 后 TERM 的 exit 143 和禁止认证的 exit 255。
+环境为 Ubuntu 24.04.4 amd64、KVM、1 GiB / 20 GiB、2 vCPU，初始内核 6.8.0-138-generic，
+Bash 5.2.21、Python 3.12.3。本轮未操作真实 VPS 或本机网络。
+
+- 两套标准 VM 中，真实 `sshd -t/-T -C` 先证明当前来源的管理员/root 为关闭 root 和密码认证、
+  仅 publickey；合成来源 `203.0.113.5` 则为允许 root、PasswordAuthentication yes、AuthenticationMethods password。
+  加固入口对该配置及原生语法合法的嵌套 Include 均精确返回布局拒绝；防火墙摘要不变，尚未创建 apply 备份。
+- 独立 VM 在任何脚本调用前以及首次 apply 前两次核对 UFW 包、命令和四份配置均不存在。
+  第一次 apply 安装依赖、启用 UFW 后注入中断；顶层 absent-before 保留四个路径，
+  安装后恢复基线的四份文件和摘要齐备。恢复配置并受控重启后保留 UFW 包，后续 apply、重复执行及最终重启均通过。
+- 三套摘要共 9 项均与测试提交一致；后续验证文档提交不修改这些输入。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `scripts/harden-vps.sh` | `6a102d5d4ced1c2090d8cafcc7c45a2d4f1d272de99639b3e5e30cd639e3b8f5` |
+| `tests/run_hardening_vm.py` | `02c6c0ba981484d9975763730917002da0720b83c03cdb7da29a5b6d801f9425` |
+| `tests/fixtures/ubuntu-cloud-image.json` | `24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28` |
+
+复现命令（在一次性 Linux 测试主机运行；实际命令和退出码在对应 CI 制品 `summary.json`）：
 
 ```sh
+sudo python3 -B tests/run_hardening_vm.py --ssh-mode socket --scenario standard
+sudo python3 -B tests/run_hardening_vm.py --ssh-mode service --scenario standard
 sudo python3 -B tests/run_hardening_vm.py --ssh-mode socket --scenario without-ufw
 ```
+
+制品分别为 `hardening-vm-socket`、`hardening-vm-service` 和 `hardening-vm-socket-without-ufw`，
+保留 14 天。本轮修复实现与上述测试已完成，仍待针对性复审；未自行合并 PR。
+真实 VPS 新入口、私密导出、完整组合部署和 arm64 VM 仍为 **NOT RUN**。
 
 ## 先前实现的测试记录
 
