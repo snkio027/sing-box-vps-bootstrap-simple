@@ -1,5 +1,8 @@
 # 精简版验证
 
+最新已核对的 CI 与本机后台部署范围见 [当前真实部署流程](deployment-flow.md#6-如何判定部署成功)。
+本文保留以下历史记录，不把当时的 NOT RUN 状态当作整个项目的当前状态。
+
 以下保留独立建仓前候选版的历史执行记录和当时限制；其中提交号及“当前”描述属于原开发环境。
 独立仓库的注释版检查与后续现场链路范围见 [注释与独立建仓记录](commentary-validation.md)。
 
@@ -49,3 +52,24 @@ Darwin 下载逻辑，改用当前 Homebrew Bash、curl、jq、OpenSSL、sing-bo
 当前客户端开发基线 `d117141`；脚本 SHA-256：
 `ca3c310235d4e7b62979c80926e12da97dea39ed34e00b79c9204b7a01a0762f`。
 使用方法与依赖版本快照见 [客户端说明](mac-client.md)。
+
+## 2026-09-06：通用防回环修复
+
+现场发现未显式绑定的 `local-direct` 将 UDP 再次送入自身 TUN。修复为
+`route.auto_detect_interface=true`；原 VPS 的 `bind_interface=en4` 保持原值，临时两个 `/32`
+拒绝规则已移除。此问题不能归咎于 Pod 配置，也未证明是 sing-box 程序缺陷。
+
+在 macOS 26.6.2、固定 sing-box 1.14.0 上，先执行候选 `check`，exit 0；备份后原子更新并由
+launchd 重启。16 项现场断言通过，验证程序 exit 0：原目标、另一个 Pod 和额外私网目标的
+有界 UDP/TCP 探测未出现自有 socket 回流；观测 UDP 出站为 en4；本机回环、已有容器桥和
+OrbStack 域名经 SOCKS 访问成功；TUN/SOCKS 的 Apple、Cloudflare HTTPS 与 VPS 出口验证通过。
+约 10 秒未主动测速的采样中，sing-box CPU 约 0.6%，原先约 180% 的异常负载消失。
+DNS、系统代理设置及 plist 未变，验证期间进程稳定。
+
+精确命令、私密目标、配置备份、时间戳和原始采样保留在本机私密证据中，未上传。
+这些是当前环境的有限验证，不保证任意私网、其他 VPN 或任意容器网段可达。
+在这次现场记录的截止时点，新配置整机重启、完整 Pod 业务网络及 SSH 对照为 NOT RUN；
+后续结果另按 [部署证据范围](deployment-flow.md#6-如何判定部署成功) 记账。
+
+修复后相同的三次 10 MB SS2022 下载为 55.97、61.41、12.63 Mbps，均 exit 0、HTTP 200、
+TLS 验证通过、无重定向且字节数完整。慢速仍有出现，不能把防回环修复写成全部性能问题已解决。
