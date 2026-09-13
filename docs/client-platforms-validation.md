@@ -29,11 +29,17 @@ CI 仅上传该专用公开输入结果目录，不打包整个工作区。
   既有 hardening-unit.sh 的 10 组检查 PASS，exit 0。
 - 本机既有 client-unit.sh：exit 1，在前 8 组通过后因缺少 Homebrew 依赖停止；未把部分通过当作整套通过。
   不安装或升级本机依赖，完整客户端套件交给 macOS CI。
-- CI 的精确 1.14.0 四份配置构建检查：待 CI，NOT RUN。
+- 提交 `be373309a5e94e25748a17809d2ec298fca931b3` 的
+  [CI 34752082076](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34752082076)：
+  static 与 mac-client 通过；macOS 完整 client-unit.sh 通过。
+  该 CI 的四份配置构建检查全部 exit 0，使用 Homebrew sing-box 1.14.0 / Go 1.26.7、
+  Darwin 25.6.0 arm64、Python 3.14.7。已下载 client-profiles 制品，核对全部 7 项源码摘要与该提交一致。
+  原生检查未使用本机的 1.13.18 代替 1.14.0。
 - Android / iOS 应用导入、VPN、无缓存启动、Wi-Fi/蜂窝切换、锁屏、退出恢复、局域网 DNS、
   不可达私网无回环、IPv6/NAT64：NOT RUN。
 - 本批 Mac 完整 TUN 及真实 VPS 回归：NOT RUN；历史现网结论不作为移动端证据。
 - 自动 SSH 私密取回、三端私密导出、干净 VM 完整组合部署：未实现 / NOT RUN。
 
-CI 链接在结果取得后补入本页。手机内核版本尚未采集，特别是 iOS 的应用 1.14.4
+仓库既有 Ubuntu 安装与加固 VM 回归仍按各 CI job 记账，不作为新增移动配置的运行证据。
+手机内核版本尚未采集，特别是 iOS 的应用 1.14.4
 不能用作内核 1.14.0 的证据。设备验收清单见 [客户端说明](client-platforms.md)。
