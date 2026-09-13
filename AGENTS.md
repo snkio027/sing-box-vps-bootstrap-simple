@@ -23,6 +23,13 @@ The previous controller, schemas and ADRs are historical at commit
   Do not return to system Bash 3.2 or hardcoded client release downloads.
 - Client scope: private config import, terminal-owned SOCKS5 on 127.0.0.1:17890,
   explicit physical interface (default en4), MUX off, one HTTPS check and Ctrl+C cleanup.
+- Approved full configuration examples additionally target Mac CLI, Android SFA and
+  iOS sing-box MT. Record the stable core and app versions separately at delivery.
+  Mobile templates retain automatic interface protection, omit fixed interfaces,
+  extra listeners and unprovided rule files, and keep the existing TCP policy.
+  CLI checks do not establish mobile VPN, switching-network or background behavior;
+  those require device evidence. This scope does not change connect-vps.sh or deploy
+  configurations to the operator's devices automatically.
 - Ubuntu 24.04, amd64/arm64; sing-box 1.14.0; single-user SS2022 on IPv4 TCP 443.
 - APT refresh/dependencies, explicit optional system upgrade, conditional 1 GiB swap,
   private configuration and a non-root systemd service are the first version.
