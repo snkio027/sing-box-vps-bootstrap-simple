@@ -18,6 +18,7 @@ jobs:
       - run: sudo bash tests/unit.sh
       - run: bash tests/client-unit.sh
       - run: bash tests/hardening-unit.sh
+      - run: python3 -B tests/client_profiles_test.py
   mac-client:
     runs-on: macos-26
     timeout-minutes: 10
@@ -29,10 +30,14 @@ jobs:
       - run: /opt/homebrew/bin/bash -n scripts/connect-vps.sh
       - run: /opt/homebrew/bin/bash tests/client-unit.sh
       - name: Check redacted configuration examples without starting TUN
-        run: |
-          /opt/homebrew/bin/sing-box version
-          /opt/homebrew/bin/sing-box check -D "$PWD/examples/1.14.0" -c "$PWD/examples/1.14.0/server.example.json"
-          /opt/homebrew/bin/sing-box check -D "$PWD/examples/1.14.0" -c "$PWD/examples/1.14.0/macos.example.json"
+        run: python3 -B tests/check_client_profiles.py --binary /opt/homebrew/bin/sing-box
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: client-profiles
+          path: artifacts/client-profiles/
+          if-no-files-found: warn
+          retention-days: 14
   vm:
     needs: static
     runs-on: ubuntu-24.04

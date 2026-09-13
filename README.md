@@ -91,8 +91,10 @@ systemctl restart sing-box
 
 ## 完整配置审查样例
 
-用于通过自有 VPS 替换现用 Mac 代理的 sing-box 1.14.0 两端脱敏配置，见
+用于通过自有 VPS 连接 Mac、Android 和 iOS 的 sing-box 1.14.0 脱敏配置，见
 [配置样例与审查说明](examples/1.14.0/README.md)。包括本地路由、系统本地域解析、GeoIP 边界和协议限制。
+移动模板已经提供；稳定版、平台差异和私密导入步骤见 [多平台客户端](docs/client-platforms.md)，
+检查证据见 [验证记录](docs/client-platforms-validation.md)。手机 VPN 实机验收仍为 **NOT RUN**。
 样例使用公开测试地址与测试密钥，不可直接部署。本机已在该基线上加入固定日志及回环 7890 兼容入口，
 完成有限 TUN、真实 HTTPS 和后台重启验证，并通过一次整机重启后的自启及联网核验。
 OrbStack 基础域名/容器网络和现有 kind 控制面也已实测；Pod 业务网络、OrbStack 内置 Kubernetes 及完整回退仍未实测。
@@ -105,6 +107,7 @@ for script in scripts/*.sh tests/*.sh; do bash -n "$script"; done
 shellcheck -x scripts/*.sh tests/*.sh
 sudo bash tests/unit.sh
 bash tests/client-unit.sh
+python3 -B tests/client_profiles_test.py
 ```
 
 GitHub Actions 在一次性 Ubuntu 24.04 VM（1 GiB / 20 GiB）中运行真实安装、系统升级、重复执行、

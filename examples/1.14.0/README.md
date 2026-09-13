@@ -1,12 +1,27 @@
-# sing-box 1.14.0 两端配置审查样例
+# sing-box 1.14.0 服务端与三端客户端样例
 
-本目录是操作者私密候选配置的结构脱敏副本，用于审查通过自有 VPS 替换现用 Mac 代理的方案。
+本目录包含既有服务端、Mac 配置的脱敏副本，以及从相同策略适配的 Android、iOS 模板。
 **它不是可直接部署的配置，也不代表正式切换已经完成。**
 
 | 文件 | 用途 |
 |---|---|
 | [server.example.json](server.example.json) | VPS：SS2022、IPv4 TCP 443、服务端允许 MUX、direct 出站 |
 | [macos.example.json](macos.example.json) | Mac：TUN、回环 mixed、DNS、分流、广告阻断、带认证的 Clash API |
+| [android.example.json](android.example.json) | SFA：系统 VPN、自动接口保护、平台本地 DNS，无固定网卡或额外端口 |
+| [ios.example.json](ios.example.json) | sing-box MT：系统 VPN，沿用相同移动策略；内置内核需在设备核对 |
+| [client-versions.json](client-versions.json) | 2026-09-13 核实的稳定内核、应用版本与来源 |
+
+## 移动端适配
+
+Android / iOS 保留 TCP 443、MUX 关闭、FakeIP、国内直连、其余普通 TCP 经 VPS 与广告规则。
+所有 bind_interface、Mac 的 strict_route、mixed 入站和未随包交付的 initial_path 均移除；
+保留 route.auto_detect_interface=true。clash_api 仅有 default_mode=rule，不监听控制端口。
+移动端规则必须经 VPS 首次下载，缓存位于应用工作目录。没有增加 UDP 代理支持或自动直连回退。
+
+下文关于 en4、回环端口、initial_path 和现场部署的说明专指既有 Mac 样例。
+两份移动模板只以缓存 ID 区分，单独保存方便导入和审核；平台本地 DNS、VPN 与切网效果分别验收。
+官方应用版本、私密导入和设备验收步骤见 [多平台客户端说明](../../docs/client-platforms.md)，
+本批测试结果见 [验证记录](../../docs/client-platforms-validation.md)。
 
 ## 脱敏范围
 
@@ -16,7 +31,7 @@
 - 管理 API secret 替换为 `REPLACE_WITH_A_RANDOM_LOCAL_API_SECRET`。
 - 未上传真实地址、实际密钥、账号、本机私有绝对路径、原始真实主机报告或私密配置文件。
 
-除此之外，两份 JSON 与对应私密候选的配置结构和值相同。
+除此之外，既有服务端和 Mac JSON 与对应私密候选的配置结构和值相同；移动模板为本批新增。
 没有把占位值藏在环境变量、命令参数或在线订阅地址中；实际部署时应通过私密文件提供真实值。
 
 ## 本轮修订
@@ -104,8 +119,18 @@ git diff --check
 这仅确认当前出口前提，原始地址与响应记录留在私密目录，不证明 TUN 中的本地域解析。
 这些配置检查不需要本地 SRS 文件，不执行 `run`，不创建 TUN、不连接示例地址，也不证明启动可用。
 
-现有 macOS CI 增加这两份样例的 `check`，使用该 job 安装的 Homebrew 当前稳定版并记录实际版本；
-它与上述精确 1.14.0 本机复核分别记账。CI 是否通过，以 PR 的实际检查状态为准。
+macOS CI 现在通过下列入口检查服务端及三份客户端，使用该 job 安装的 Homebrew 当前稳定版；
+检查入口要求版本记录中的精确 1.14.0，否则停止，避免未来升级后仍标成 1.14.0 的证据。
+它与上述历史本机复核分别记账。CI 是否通过，以 PR 的实际检查状态为准。
+
+```sh
+python3 -B tests/client_profiles_test.py
+python3 -B tests/check_client_profiles.py --binary /path/to/sing-box-1.14.0
+```
+
+在仓库根目录执行。第二条只读取四份明确列出的公开样例，使用临时工作目录进行 check，
+不启动 TUN；命令、系统版本、7 份源文件摘要及退出码写入忽略的 artifacts/client-profiles/。
+Android/iOS 的 check 是桌面内核配置构建检查，不是手机应用运行测试。
 
 ## 尚未验收的部分
 

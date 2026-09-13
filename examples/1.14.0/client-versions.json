@@ -1,0 +1,21 @@
+{
+  "checked_on": "2026-09-13",
+  "core": {
+    "version": "1.14.0",
+    "release": "https://github.com/SagerNet/sing-box/releases/tag/v1.14.0",
+    "commit": "0b8995879f29a9b98ee027bc17b75e101445b238",
+    "prerelease": false
+  },
+  "android": {
+    "application": "sing-box for Android",
+    "version": "1.14.0",
+    "arm64_apk_sha256": "044628bc011bbeef641c4ad37dc722f192a621a0cf039e84f2f45490e860eb36"
+  },
+  "ios": {
+    "application": "sing-box MT",
+    "application_version": "1.14.4",
+    "store": "https://apps.apple.com/us/app/sing-box-mt/id6785326793",
+    "embedded_core": null,
+    "embedded_core_status": "Requires on-device confirmation"
+  }
+}
