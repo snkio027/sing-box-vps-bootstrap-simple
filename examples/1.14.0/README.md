@@ -1,7 +1,11 @@
 # sing-box 1.14.0 服务端与三端客户端样例
 
 本目录包含既有服务端、Mac 配置的脱敏副本，以及从相同策略适配的 Android、iOS 模板。
-**它不是可直接部署的配置，也不代表正式切换已经完成。**
+**它是公开测试值的审查基线，不可直接部署。**
+2026-09-06 操作者 Mac 已在该基线上完成有限 TUN、真实 HTTPS 及 launchd 后台接管；
+生产配置另外增加固定日志和回环 7890 兼容入口，详见 [当前真实部署流程](../../docs/deployment-flow.md)。
+已通过一次整机重启后的自启及 HTTPS 核验；OrbStack 基础域名/容器网络和现有 kind 控制面也已实测。
+Pod 业务网络、OrbStack 内置 Kubernetes 和完整回退仍未实测。
 
 | 文件 | 用途 |
 |---|---|
@@ -31,15 +35,16 @@ Android / iOS 保留 TCP 443、MUX 关闭、FakeIP、国内直连、其余普通
 - 管理 API secret 替换为 `REPLACE_WITH_A_RANDOM_LOCAL_API_SECRET`。
 - 未上传真实地址、实际密钥、账号、本机私有绝对路径、原始真实主机报告或私密配置文件。
 
-除此之外，既有服务端和 Mac JSON 与对应私密候选的配置结构和值相同；移动模板为本批新增。
+除此之外，既有服务端和 Mac JSON 与当时接受审核的私密候选结构和值相同；移动模板为本批新增。
+当前后台版本的额外运行配置见上述部署流程。
 没有把占位值藏在环境变量、命令参数或在线订阅地址中；实际部署时应通过私密文件提供真实值。
 
 ## 本轮修订
 
-1. **未显式绑定的出站启用自动接口保护。** 设置 `route.auto_detect_interface=true`；
-   `local-direct` 不硬编码 `bind_interface`，全局不指定 `default_interface`。VPS、普通公网
-   direct 和国内 DoH 的显式 `en4` 绑定保持不变。自动接口保护用于防止自身 TUN 回环，
-   不会创建到容器、私网或其他 VPN 的可达路由；这些路径仍需分别验证。
+1. **本地出站启用自动接口保护。** `route.auto_detect_interface=true`；`local-direct` 不硬编码
+   `bind_interface`，全局不指定 `default_interface`。自动检测为未显式绑定的出站提供防回环保护；
+   VPS、普通公网 direct 和国内 DoH 继续显式绑定 `en4`。实际到本机、桥接或 VPN 目标的路径仍需验证。
+   不能因为地址属于私网，就假定系统存在绕过当前 TUN 的可达路由。
 2. **本地域名读取系统解析配置，上游连接绑定 en4。** `dns-local` 保留 `type=local`、
    `prefer_go=false`，新增 `bind_interface=en4`。1.14.0 可自行向系统 DNS 上游发出查询，
    `prefer_go=false` 不保证每次由 macOS 代发；绑定物理接口避免这些上游连接依赖 TUN 默认路由，
@@ -69,7 +74,7 @@ Android / iOS 保留 TCP 443、MUX 关闭、FakeIP、国内直连、其余普通
 
 | 流量 | 默认 rule 模式 |
 |---|---|
-| 本机、私有地址、本地域名 | local-direct，自动接口保护；可达路径另行验证 |
+| 本机、私有地址、本地域名 | local-direct，使用自动接口保护；目标的真实可达路径须另行验证 |
 | VPS 地址 | en4 直连，避免到 VPS 的 SSH 等连接绕回代理 |
 | 国内域名列表中的普通 TCP | en4 直连 |
 | 其他普通域名 TCP | 经 VPS |
@@ -94,11 +99,11 @@ API 切换 global/direct 时仍保留前置的本地、公网 IPv6 和广告策�
 
 依据：[1.14.0 initial_path / HTTP client](https://github.com/SagerNet/sing-box/blob/v1.14.0/docs/configuration/rule-set/index.md)。
 
-真正替换现用代理时，还需完成原配置/启动项备份，核对系统 DNS 上游经 en4 的可达性、
+迁移到其他机器时，需要完成原配置/启动项备份，核对系统 DNS 上游经 en4 的可达性、
 现有应用端口、系统代理和 PAC/WPAD，
 处理入口兼容性，验证完整 TUN 接管与退出恢复，最后验证新启动项持久运行。
 不能只替换 JSON 就声称日常流量已经切换。不要同时运行两套 auto_route TUN。
-本轮没有修改安装器或 `connect-vps.sh`；后者仍只生成它自己的最小 SOCKS 配置，不加载此完整 TUN 样例。
+样例基线没有修改安装器或 `connect-vps.sh`；后者仍只生成它自己的最小 SOCKS 配置，不加载此完整 TUN 样例。
 
 ## 公开样例验证
 
@@ -132,20 +137,24 @@ python3 -B tests/check_client_profiles.py --binary /path/to/sing-box-1.14.0
 不启动 TUN；命令、系统版本、7 份源文件摘要及退出码写入忽略的 artifacts/client-profiles/。
 Android/iOS 的 check 是桌面内核配置构建检查，不是手机应用运行测试。
 
-## 尚未验收的部分
+## 公开样例与现场部署的边界
+
+下面仍按公开测试值的样例记账。操作者的实际私密配置、限时试跑和后台接管结果
+另见 [部署证据范围](../../docs/deployment-flow.md#6-如何判定部署成功)，不能混写为示例地址的实际请求。
 
 | 检查 | 本次公开样例状态 |
 |---|---|
 | JSON 解析、精确 1.14.0 配置检查、脱敏结构比较 | PASS，exit 0 |
 | 样例地址/公开测试密钥的真实代理请求 | NOT RUN；这些值不得用于部署 |
-| 本次修订的完整 TUN 退出恢复、整机重启自启 | NOT RUN；有限现场验证见下文 |
-| 完整 OrbStack / Kubernetes 业务网络 | NOT RUN；有限本地访问场景见下文 |
+| 使用公开测试值的完整 TUN/后台部署 | NOT RUN；实际私密部署已另行完成有限验证 |
+| 使用公开测试值的 OrbStack/Kubernetes 场景 | NOT RUN；实际私密部署已另行核验现有容器与 kind 基础路径，Pod 业务网络仍未测 |
 
 公开仓库没有附带真实主机证据。私密候选的有限测试不能被当作这份公开样例的实际部署证明，
 更不能替代完整 TUN、容器网络或正式切换验收。
 
-## 通用防回环修订
-
-本次只为公开 JSON 增加 `route.auto_detect_interface=true`，不加入 Pod IP 拒绝列表。
-对应现场配置已通过有限防回环、本地访问和 HTTPS 验证；速度仍有波动。
-[独立验证记录](../../docs/mac-tun-loop-validation.md)及其脱敏数据将这些结论与待验证项目分别记账。
+2026-09-06 后续防回环修复启用 `route.auto_detect_interface=true`，不使用 Pod IP 黑名单。
+本机回环、已有容器桥与 OrbStack 域名路径已在此配置下重新验证，详见
+[独立验证记录及脱敏证据](../../docs/mac-tun-loop-validation.md)与
+[历史验证记录](../../docs/validation.md)。自动接口检测不代表 Pod 网络自动可达。
+依据：[1.14.0 自动接口检测](https://github.com/SagerNet/sing-box/blob/v1.14.0/docs/configuration/route/index.md#auto_detect_interface)、
+[接口选择实现](https://github.com/SagerNet/sing-box/blob/v1.14.0/route/network.go)。

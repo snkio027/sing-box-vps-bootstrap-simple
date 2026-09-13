@@ -1,5 +1,8 @@
 # Mac 客户端
 
+本文只说明仓库中的 `scripts/connect-vps.sh`，它不是当前日用 TUN 后台服务的安装器。
+VPS 到 Mac 完整部署顺序、固定 1.14.0 后台布局及实测边界见 [当前真实部署流程](deployment-flow.md)。
+
 一个 Bash 脚本连接已部署的 VPS。适用于 **Apple Silicon Mac + Homebrew**。
 项目依赖全部使用 Homebrew 当前稳定版：Bash、curl、jq、OpenSSL、sing-box。
 运行时明确选择 Homebrew 工具路径；不使用系统 Bash 3.2，也不固定下载某个旧版客户端包。
@@ -76,7 +79,7 @@ setup 导入原密钥并用当前 sing-box 检查配置。连接设置保存在
 支持 SOCKS5 的应用填写 `127.0.0.1`、端口 `17890`，并启用通过代理解析域名。
 只代理明确选择该端口的应用；脚本不接管系统代理、TUN、DNS、路由或已有的后台服务。
 回环端口不设额外认证，同一 Mac 上能访问它的本地进程可以使用这条代理。
-没有 launchd、后台安装或通用进程控制器。
+本脚本没有 launchd、后台安装或通用进程控制器；本机另行完成的完整后台部署不由它启动。
 
 ## 检查与排障
 
@@ -105,12 +108,14 @@ rmdir "$HOME/Library/Application Support/sing-box-vps/running.lock"
 
 ## 验证状态
 
-本地 Bash 语法、ShellCheck 和 10 项逻辑检查通过，覆盖私密配置、实际 jq 解析、输入拒绝、
-密钥不进入子进程环境、无 direct 回退和合成 HTTPS 响应处理。
-本地工具是 Linux Bash 5.2.21、jq 1.7、OpenSSL 3.0.13；这些结果不等于最新 Homebrew 组合实测。
+2026-09-06 核对已审核配置基线 `4258dda` 的 [CI](https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/34030386419)：
+static、mac-client、vm 三个 job 均 success。Mac job 在 macOS 26 更新 Homebrew 依赖后，
+执行脚本语法、客户端单元测试及两份公开配置的 `check`；不会启动 TUN 或连接真实 VPS。
 
-macOS 原生 CI 已改为先更新以上依赖，再使用 Homebrew Bash 和 sing-box 检查；
-上述候选版记录时 GitHub 写入权限受限，CI 尚未运行。
-**本脚本的最新 Homebrew 依赖组合、真实启动、en4 绑定及 HTTPS 完整流程仍为 NOT RUN。**
-随后独立临时客户端已完成真实链路检查；其结果与本脚本验收分别记录在
-[注释与独立建仓记录](commentary-validation.md)。公开仓库不包含任何真实配置或连接文件。
+本脚本从 setup 到 run/check 的真实公网完整流程仍为 **NOT RUN**。已有的独立临时客户端、
+以及当前固定 1.14.0 TUN 后台均完成了实际 HTTPS 验证，但不能替代这个脚本自身的端到端验收。
+本脚本的检查仅确认响应具有 `ip=` 字段，不比较它是否等于用户提供的 VPS IPv4；
+现场完整 TUN 验证另有出口相等检查及 en4 socket 观测。
+
+早期依赖不全或尚未触发 CI 的记录保留在 [历史验证记录](validation.md) 和
+[注释与独立建仓记录](commentary-validation.md)。公开仓库不包含真实配置或连接文件。
