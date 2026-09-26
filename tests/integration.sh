@@ -57,11 +57,11 @@ systemctl is-active --quiet sing-box
 [[ $(grep -Fxc '/var/lib/sing-box/swapfile none swap sw 0 0' /etc/fstab) == 1 ]]
 pass 'real installation, private config, service account, swap and unchanged SSH'
 
-# Reproduce the released candidate's missing NETLINK_ROUTE access, then repair by rerunning.
+# Deliberately deny network address families, then verify rerun repairs the managed unit.
 UNIT=/etc/systemd/system/sing-box.service
 cp "$UNIT" "$WORK/good.service"
 KEY_CONFIG_BEFORE=$(sha256sum /etc/sing-box/config.json)
-sed -e 's/ AF_NETLINK//g' -e 's/^Restart=on-failure$/Restart=no/' "$UNIT" > "$WORK/restricted.service"
+sed -e 's/^RestrictAddressFamilies=.*/RestrictAddressFamilies=AF_UNIX/' -e 's/^Restart=on-failure$/Restart=no/' "$UNIT" > "$WORK/restricted.service"
 install -o root -g root -m 0644 "$WORK/restricted.service" "$UNIT"
 systemctl daemon-reload
 systemctl restart sing-box.service || true
@@ -72,12 +72,12 @@ done
 [[ $(systemctl show sing-box -p ActiveState --value) == failed ]]
 [[ $(systemctl show sing-box -p ExecMainStatus --value) == 1 ]]
 journalctl --no-pager -u sing-box -b -n 30 -o cat > "$WORK/restricted.log"
-grep -Fq 'subscribe route updates: address family not supported by protocol' "$WORK/restricted.log"
+grep -Fq 'address family not supported by protocol' "$WORK/restricted.log"
 bash "$INSTALLER" >"$WORK/recovery.log" 2>&1 || { cat "$WORK/recovery.log"; exit 1; }
 cmp "$UNIT" "$WORK/good.service"
 [[ $(sha256sum /etc/sing-box/config.json) == "$KEY_CONFIG_BEFORE" ]]
 systemctl is-active --quiet sing-box
-pass 'missing AF_NETLINK reproduces the failure; rerun repairs service without changing the key'
+pass 'overrestricted network families fail startup; rerun repairs service without changing the key'
 
 # 健康重跑必须保留 PID、配置/密钥、fstab 和 swap 的文件身份；APT 刷新仍允许发生。
 PID=$(systemctl show sing-box -p MainPID --value)

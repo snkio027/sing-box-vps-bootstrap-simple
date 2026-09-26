@@ -11,7 +11,8 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 # guest 只读共享这三个明确文件，避免把仓库里的凭据或其他用户文件一起暴露。
-SOURCES = ('scripts/prepare-vps.sh', 'tests/integration.sh', 'tests/https_fixture.py')
+SOURCES = ('scripts/prepare-vps.sh', 'scripts/maintain-vps.sh', 'tests/integration.sh',
+           'tests/maintenance-integration.sh', 'tests/https_fixture.py')
 
 
 def run(args, **kwargs):
@@ -55,7 +56,7 @@ runcmd:
   - [mkdir, -p, /mnt/input, /mnt/output]
   - [mount, -t, 9p, -o, "trans=virtio,version=9p2000.L,ro", input, /mnt/input]
   - [mount, -t, 9p, -o, "trans=virtio,version=9p2000.L", output, /mnt/output]
-  - [bash, -c, "echo simple-installer-fixture > /root/SIMPLE_INSTALLER_DISPOSABLE_VM; bash /mnt/input/tests/integration.sh > /mnt/output/result.log 2>&1; code=$?; echo $code > /mnt/output/exit-code; sync; poweroff"]
+  - [bash, -c, "echo simple-installer-fixture > /root/SIMPLE_INSTALLER_DISPOSABLE_VM; (bash /mnt/input/tests/integration.sh && bash /mnt/input/tests/maintenance-integration.sh) > /mnt/output/result.log 2>&1; code=$?; echo $code > /mnt/output/exit-code; sync; poweroff"]
 '''
         (work / 'user-data').write_text(user_data)
         (work / 'meta-data').write_text('instance-id: simple-installer-fixture\nlocal-hostname: simple-fixture\n')
@@ -74,7 +75,7 @@ runcmd:
             '-netdev', 'user,id=network', '-device', 'virtio-net-pci,netdev=network']
         # 限制整次 VM 生命周期；即使失败也尽量保存 guest 的非密钥测试日志。
         try:
-            run(command, timeout=1200)
+            run(command, timeout=1800)
         finally:
             if (results / 'result.log').exists():
                 shutil.copyfile(results / 'result.log', output / 'result.log')

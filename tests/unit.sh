@@ -15,9 +15,9 @@ reject() { if ("$@") >"$TEMP/rejection" 2>&1; then say 'Expected rejection.'; ex
 
 # 固定支持架构与信任常量，未知架构必须在安装之前被拒绝。
 artifact_for_arch amd64
-[[ $ARCHIVE_SIZE == 32258946 && $BINARY_SIZE == 91842368 && $ARCHIVE_URL == *linux_amd64.deb ]]
+[[ $ARCHIVE_SIZE == 32302424 && $BINARY_SIZE == 91951072 && $ARCHIVE_URL == *linux_amd64.deb ]]
 artifact_for_arch arm64
-[[ $ARCHIVE_SIZE == 29525840 && $BINARY_SIZE == 85908600 && $ARCHIVE_URL == *linux_arm64.deb ]]
+[[ $ARCHIVE_SIZE == 29564014 && $BINARY_SIZE == 86012408 && $ARCHIVE_URL == *linux_arm64.deb ]]
 reject artifact_for_arch riscv64
 pass 'fixed architectures and artifact locks'
 

@@ -22,6 +22,14 @@ VPS 安装已有通用脚本；操作者 Mac 已完成 1.14.0 完整 TUN 和 lau
 新主机按初始化、下面的代理安装、私密客户端交接和链路/重启验证顺序部署。
 私密取回与完整组合部署仍待第二批，见 [开发计划](docs/next-steps.md)。
 
+## 升级与新增协议
+
+已实现分开调用的 [1.14.2 升级与 REALITY 维护入口](docs/reality-upgrade.md)：
+原 SS2022 TCP 443 保留，新增 VLESS + REALITY + Vision TCP 8443，三端候选默认继续选择 SS2022。
+新装脚本固定 1.14.2；旧版通过 `maintain-vps.sh upgrade`，添加新协议后不要重跑单协议安装器。
+[双协议样例](examples/1.14.2/README.md) 与 [本批验证状态](docs/reality-validation.md) 单独记录；
+此前 1.14.0 的现网验收不代表新版本已部署。
+
 ## 使用
 
 通过你已经验证主机指纹的 SSH/SFTP 连接，上传 `scripts/prepare-vps.sh`。在 VPS 上执行：
@@ -49,7 +57,7 @@ VPS 需要可工作的 APT/HTTPS 网络、已同步的系统时间和 systemd。
 2. 执行 APT update，安装 curl、jq、OpenSSL 等依赖。
 3. 创建锁定密码、不可登录的 `sing-box` 服务账号。内存不超过 2 GiB、无现有 swap，且 ext4/xfs
    剩余空间至少 5 GiB 时创建 1 GiB swap；已有活动或 fstab 配置的 swap 保持原样。
-4. 下载固定版本 **1.14.0** 的官方 `.deb`，验证固定大小与 SHA-256，只取出并再次校验
+4. 下载固定版本 **1.14.2** 的官方 `.deb`，验证固定大小与 SHA-256，只取出并再次校验
    `usr/bin/sing-box`，安装到 `/usr/local/bin/sing-box`。不执行包脚本或安装包内 Polkit/D-Bus 授权。
    sing-box 是手工安装的单一二进制，不登记为 APT 软件包，也不会随 APT 隐式升级。
 5. 在 VPS 本地生成 16 字节随机密钥；重复执行读取原密钥。生成配置并以服务账号运行 `sing-box check`，
