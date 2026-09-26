@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# Ubuntu 24.04 / sing-box 1.14.0. Upload this file; run it as root.
+# Ubuntu 24.04 / sing-box 1.14.2. Upload this file; run it as root.
 # 服务端入口：只上传本文件，以 root 执行，无需 Python、模板或构建产物。
 # 主流程见文件末尾 main：预检 → APT 依赖 → 账号/swap → 可选升级 → 二进制 → 配置 → 验证。
 # 本脚本会修改系统；它没有 --check/--plan，也不提供跨步骤事务或自动回滚。
@@ -17,7 +17,7 @@ unset BASH_ENV ENV CDPATH
 umask 077
 
 # 固定版本与部署路径。MARKER 只标识本脚本维护的文件，不是密码或完整状态数据库。
-VERSION=1.14.0
+VERSION=1.14.2
 BIN=/usr/local/bin/sing-box
 CONFIG=/etc/sing-box/config.json
 UNIT=/etc/systemd/system/sing-box.service
@@ -34,7 +34,7 @@ die() { printf 'ERROR [%s]: %s\n' "$STEP" "$*" >&2; exit 1; }
 usage() {
     cat <<'EOF'
 Usage: sudo bash prepare-vps.sh [--upgrade-system]
-Install sing-box 1.14.0 (IPv4 TCP 443, SS2022), optional 1 GiB swap,
+Install sing-box 1.14.2 (IPv4 TCP 443, SS2022), optional 1 GiB swap,
 private configuration and an enabled systemd service on Ubuntu 24.04.
 APT indexes/dependencies are refreshed on every run. --upgrade-system also
 runs apt-get upgrade, preserving existing config files. No automatic reboot.
@@ -48,15 +48,15 @@ EOF
 artifact_for_arch() {
     case "$1" in
         amd64)
-            ARCHIVE_SIZE=32258946
-            ARCHIVE_SHA=84035ea7eb85570830af77801e8e949d3769dd23bbcacce08df3bfde1945f299
-            BINARY_SIZE=91842368
-            BINARY_SHA=ce3ed8667dd99ff40c85a8b236075e856ea9cb80731b304cedd2a47187828120 ;;
+            ARCHIVE_SIZE=32302424
+            ARCHIVE_SHA=3a15ee1ee918cb5297ccf7fb4356b31ba85f8a7c01da122c5b3e3aeda0568001
+            BINARY_SIZE=91951072
+            BINARY_SHA=4b5cef575df2e5572eddf7c204b4adea03a27d9721c5e39a89df5fb6977643cb ;;
         arm64)
-            ARCHIVE_SIZE=29525840
-            ARCHIVE_SHA=80378caee6f5fdc0557f9aad0c3ade9341a4a4a66e3755c9f0d228c3d697f6e7
-            BINARY_SIZE=85908600
-            BINARY_SHA=5f4d9ef9436b36a6cb9db8831833264c11fe4cab1622cec465c0acfd3abfffac ;;
+            ARCHIVE_SIZE=29564014
+            ARCHIVE_SHA=283b31355c1213afe0f6c93498884ef6ff34cd38679789fe1af900d84691e51c
+            BINARY_SIZE=86012408
+            BINARY_SHA=fb9189e2d14f2795aa86adc070f7a61d1c74c299f519e52a021b1bbc720b4769 ;;
         *) die 'Supported architectures: amd64, arm64.' ;;
     esac
     ARCHIVE_URL="https://github.com/SagerNet/sing-box/releases/download/v${VERSION}/sing-box_${VERSION}_linux_${1}.deb"
@@ -191,7 +191,13 @@ preflight() {
         [[ ! -e $CONFIG ]] || die 'Existing sing-box configuration is not managed by this script.'
         [[ $(systemctl show sing-box.service -p LoadState --value) == not-found ]] || die 'Another sing-box unit exists.'
     fi
-    if [[ -e $BIN ]]; then matches_artifact "$BIN" "$BINARY_SIZE" "$BINARY_SHA" || die 'Existing binary differs from the pinned version.'; fi
+    if [[ -e $BIN ]]; then matches_artifact "$BIN" "$BINARY_SIZE" "$BINARY_SHA" || die 'Existing binary differs from the pinned version; use maintain-vps.sh upgrade for the reviewed 1.14.0 source.'; fi
+    # 添加新协议后不能由单协议安装器覆盖；在 APT/账号等持久修改之前停止。
+    if [[ -f $CONFIG ]]; then
+        command -v jq >/dev/null || die 'Existing configuration requires jq for safe inspection.'
+        jq -e '.inbounds|length==1 and .[0].type=="shadowsocks"' "$CONFIG" >/dev/null 2>&1 ||
+            die 'Extended/unknown configuration; use maintain-vps.sh instead of rerunning the SS2022 installer.'
+    fi
     local listeners pid
     # 保留全部 TCP 443 监听，包括 127.0.0.1 和 IPv6；它们也可能阻止通配地址绑定。
     # 只有已标记 unit 的 MainPID、可执行路径和每条监听归属都吻合时，才允许重跑。

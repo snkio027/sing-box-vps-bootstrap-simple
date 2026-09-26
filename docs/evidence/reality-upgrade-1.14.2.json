@@ -1,0 +1,85 @@
+{
+  "revision": "e58376c11a2b1bdc6e185d43dba4049739a159e6",
+  "ci": "https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/36248531505",
+  "checked_on": "2026-09-26",
+  "result": "PASS",
+  "vm": [
+    {
+      "scenario": "install-upgrade-reality",
+      "exit_code": 0,
+      "assertion_count": 18,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "source_sha256": {
+        "scripts/prepare-vps.sh": "309c951367f2e14355a99904d8082cf4ac04cd65577d3085c610c072c5bae4ed",
+        "scripts/maintain-vps.sh": "bff931261caf36ba37e246b68ff53ad250292d6211eccff4617f2345c3d556f9",
+        "tests/integration.sh": "0337e825f3dbef688cbcfbe31ed5997fb70f9aba7156d56ccbec45190345e995",
+        "tests/maintenance-integration.sh": "bc07fec54ac38cb0b0d02ab7e99b3ba17f94e5eb8cb9945f62661f1024fdbcd6",
+        "tests/https_fixture.py": "3ed61de40122f7ebf8f911a1f212e322e3d8c0c4551b809deef4e60791bcb039"
+      }
+    },
+    {
+      "scenario": "hardening-socket",
+      "exit_code": 0,
+      "assertion_count": 20,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "tests/run_hardening_vm.py": "f7dcce5fe051edbad9960dfc79117cf7b2f95c2b7afa0812ac4311b0e1140c1b",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      }
+    },
+    {
+      "scenario": "hardening-service",
+      "exit_code": 0,
+      "assertion_count": 19,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "tests/run_hardening_vm.py": "f7dcce5fe051edbad9960dfc79117cf7b2f95c2b7afa0812ac4311b0e1140c1b",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      }
+    },
+    {
+      "scenario": "hardening-without-ufw",
+      "exit_code": 0,
+      "assertion_count": 16,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "tests/run_hardening_vm.py": "f7dcce5fe051edbad9960dfc79117cf7b2f95c2b7afa0812ac4311b0e1140c1b",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      }
+    }
+  ],
+  "mac_config_check": {
+    "environment": {
+      "system": "Darwin",
+      "release": "25.6.0",
+      "machine": "arm64",
+      "python": "3.14.7"
+    },
+    "version": "1.14.2",
+    "exit_codes": {
+      "server": 0,
+      "macos": 0,
+      "android": 0,
+      "ios": 0
+    },
+    "source_sha256": {
+      "examples/1.14.2/client-versions.json": "8dd5dfb1e55f9d36455dc1495ec639f274ae962dfbcefa4b8c0b47204a7f4140",
+      "tests/check_client_profiles.py": "7bc58603d99c2bd52535071a74f82ed085f2300fcf8184a38881b58e000c60e3",
+      "tests/client_profiles_test.py": "56c6d009738843bdd5a5b72a9d37265c84c9a9294931b08eed74e461192512da",
+      "examples/1.14.2/server.example.json": "4e9fbb44b6b71c9774898d6b5dce227d1fb3d179a85c78ebb09273bae363b3bd",
+      "examples/1.14.2/macos.example.json": "ef05fc3493cde655080089dd4970b164ba3508b51965808ed6e494350d5afdfa",
+      "examples/1.14.2/android.example.json": "be91d3a2e7db455dbc654d0c0eb3ed0eac818b4cd846cac8c880fe6dab9eb499",
+      "examples/1.14.2/ios.example.json": "f629a4eb835060e638ba925977fe0069980bfa121588e0e7b3a33892f5651393"
+    }
+  },
+  "real_vps_upgrade": "NOT RUN",
+  "mac_background_upgrade": "NOT RUN",
+  "mobile_devices": "NOT RUN"
+}

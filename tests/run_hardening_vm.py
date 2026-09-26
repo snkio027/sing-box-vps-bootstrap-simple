@@ -392,6 +392,43 @@ AUDIT
                 return '\n'.join(re.sub(r'\[\d+:\d+\]', '[0:0]', line) for line in text.splitlines() if not line.startswith('#'))
             assert stable(before) == stable(after), 'Rerun changed key/groups/rules'
             passed('repeated prepare/apply retain key, groups and exact firewall rules')
+            allow = apply.replace(' apply ', ' allow-reality ')
+            ssh(r"""sudo -n python3 - <<'PATCH'
+from pathlib import Path
+p=Path('/usr/local/libexec/harden-vps.sh')
+s=p.read_text().replace('    verify_firewall 1\n', '    kill -TERM "$$"\n    verify_firewall 1\n', 1)
+Path('/usr/local/libexec/fixture-reality-interrupt.sh').write_text(s)
+PATCH
+""", user=ADMIN, label='prepare firewall interruption fixture')
+            ssh(allow.replace(SCRIPT, '/usr/local/libexec/fixture-reality-interrupt.sh'), user=ADMIN, expected=143, label='interrupt after REALITY firewall write')
+            ssh(allow, user=ADMIN, expected=1, label='interrupted firewall refuses retry', match='Interrupted firewall change')
+            ssh(r"""sudo -n bash -s <<'RESTORE'
+set -eu
+S=/var/lib/sing-box-hardening
+B=$(cat "$S/firewall-updating")
+D="$B/ufw-before-apply"
+for path in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
+  name=${path//\//_}
+  cp -p "$D/$name" "$path"
+done
+ufw reload
+cp "$B/ufw-files.sha256" "$S/ufw-files.sha256"
+cp "$B/nft.json" "$S/nft.json"
+rm -f "$S/reality-enabled"
+sha256sum -c "$S/ufw-files.sha256" >/dev/null
+rm "$S/firewall-updating"
+RESTORE
+""", user=ADMIN, label='restore interrupted REALITY firewall baseline')
+            ssh(audit, user=ADMIN, label='new connection and restored firewall audit')
+            passed('REALITY firewall interruption retains recovery baseline and blocks blind retry; restored fresh SSH succeeds')
+            ssh(allow, user=ADMIN, label='allow REALITY on managed firewall')
+            ssh(audit, user=ADMIN, label='audit three-rule firewall')
+            rules_before = ssh('sudo -n iptables-save; sudo -n ip6tables-save', user=ADMIN)
+            ssh(allow, user=ADMIN, label='repeat REALITY firewall allowance')
+            rules_after = ssh('sudo -n iptables-save; sudo -n ip6tables-save', user=ADMIN)
+            assert stable(rules_before) == stable(rules_after)
+            ssh(apply, user=ADMIN, label='repeat apply preserves REALITY rule', timeout=1800)
+            passed('REALITY allowance, repeat and later apply preserve SSH/443 and exact three-rule firewall')
             reboot_guest('controlled VM reboot after completed hardening')
             ssh(audit, user=ADMIN, label='post-reboot firewall/update persistence')
             ssh('sudo -n true; systemctl is-active --quiet ufw.service', user=ADMIN, label='post-reboot key and sudo')

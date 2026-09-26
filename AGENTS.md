@@ -30,7 +30,15 @@ The previous controller, schemas and ADRs are historical at commit
   CLI checks do not establish mobile VPN, switching-network or background behavior;
   those require device evidence. This scope does not change connect-vps.sh or deploy
   configurations to the operator's devices automatically.
-- Ubuntu 24.04, amd64/arm64; sing-box 1.14.0; single-user SS2022 on IPv4 TCP 443.
+- Ubuntu 24.04, amd64/arm64; new installs pin sing-box 1.14.2; SS2022 on IPv4 TCP 443.
+- On 2026-09-26 the user selected VLESS + REALITY + Vision and a stable-version upgrade.
+  Ship a standalone maintain-vps.sh with separate upgrade (reviewed 1.14.0 -> 1.14.2)
+  and reality calls, fixed experimental TCP 8443 and original SS2022 credentials retained.
+  Use ordinary private backups and a pending marker; refuse blind retries after interruption.
+  harden-vps.sh allow-reality alone adds TCP 8443 to an unchanged managed firewall.
+  New clients offer manual SS2022/REALITY selection, default SS2022; retain existing
+  TCP/DNS/routing/interface-protection policy. No automatic direct fallback or Vision MUX.
+  Real handshake-target selection and deployment still require precise target/action scope.
 - APT refresh/dependencies, explicit optional system upgrade, conditional 1 GiB swap,
   private configuration and a non-root systemd service are the first version.
 - Use ordinary backups and clear errors. No general transaction/recovery engine,

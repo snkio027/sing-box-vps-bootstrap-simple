@@ -20,13 +20,13 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     version = subprocess.run([str(binary), 'version'], capture_output=True, text=True, timeout=30)
     first_line = version.stdout.splitlines()[0] if version.stdout else ''
-    expected = json.loads((ROOT / 'examples/1.14.0/client-versions.json').read_text())['core']['version']
+    expected = json.loads((ROOT / 'examples/1.14.2/client-versions.json').read_text())['core']['version']
     assert version.returncode == 0 and first_line == 'sing-box version ' + expected, 'Wrong core version for reviewed templates'
     records = []
-    files = ['examples/1.14.0/client-versions.json', 'tests/check_client_profiles.py', 'tests/client_profiles_test.py']
+    files = ['examples/1.14.2/client-versions.json', 'tests/check_client_profiles.py', 'tests/client_profiles_test.py']
     with tempfile.TemporaryDirectory(prefix='client-profile-check-') as directory:
         for name in ('server', 'macos', 'android', 'ios'):
-            relative = 'examples/1.14.0/' + name + '.example.json'
+            relative = 'examples/1.14.2/' + name + '.example.json'
             files.append(relative)
             work = Path(directory) / name
             work.mkdir()

@@ -1,0 +1,40 @@
+{
+  "checked_on": "2026-09-26",
+  "core": {
+    "version": "1.14.2",
+    "release": "https://github.com/SagerNet/sing-box/releases/tag/v1.14.2",
+    "prerelease": false,
+    "commit": "af6e64c3b69e6132ebaee0e1a3d24e93903f6709"
+  },
+  "artifacts": {
+    "sing-box_1.14.2_linux_amd64.deb": {
+      "archive_size": 32302424,
+      "archive_sha256": "3a15ee1ee918cb5297ccf7fb4356b31ba85f8a7c01da122c5b3e3aeda0568001",
+      "binary_size": 91951072,
+      "binary_sha256": "4b5cef575df2e5572eddf7c204b4adea03a27d9721c5e39a89df5fb6977643cb"
+    },
+    "sing-box_1.14.2_linux_arm64.deb": {
+      "archive_size": 29564014,
+      "archive_sha256": "283b31355c1213afe0f6c93498884ef6ff34cd38679789fe1af900d84691e51c",
+      "binary_size": 86012408,
+      "binary_sha256": "fb9189e2d14f2795aa86adc070f7a61d1c74c299f519e52a021b1bbc720b4769"
+    },
+    "sing-box-1.14.2-darwin-arm64.tar.gz": {
+      "archive_size": 29161521,
+      "archive_sha256": "925c5382eca8492b0150f868a6db20b18290a38700e621724b3703fd453e032d",
+      "binary_size": 83818578,
+      "binary_sha256": "d652879eed7e38b866fa980bc2e119dcdb13968fe5e6583670293a258686d0e7"
+    }
+  },
+  "android": {
+    "application": "sing-box for Android",
+    "version": "1.14.2",
+    "arm64_apk_sha256": "4f97d009048a714c14313d582e714b0cd94503333f85bb733aad9aa13b5023c5"
+  },
+  "ios": {
+    "application": "sing-box MT",
+    "application_version": null,
+    "embedded_core": null,
+    "status": "Confirm current app and embedded core on device; NOT RUN"
+  }
+}

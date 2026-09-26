@@ -27,6 +27,9 @@ prepare and apply are separate calls. Existing SSH port is verified, not changed
 apply grants full NOPASSWD administrator elevation, disables root/password/keyboard
 SSH login, enables dual-stack UFW and daily security updates. Necessary service
 restarts and brief interruptions are allowed; automatic machine reboot is forbidden.
+After approved REALITY installation, separately allow its fixed TCP 8443 port:
+  sudo --preserve-env=SSH_CONNECTION bash harden-vps.sh allow-reality --admin NAME --ssh-port PORT --confirm-console
+Only an already applied, unchanged managed firewall is eligible. No SSH/update policy changes.
 This is not a proxy installer. No private key or password input is accepted.
 EOF
 }
@@ -272,7 +275,7 @@ install_dependencies() {
 # 这是依赖安装后的回滚基线，不覆盖 make_backup 的安装前文件/absent-before。
 # 初始未安装 UFW 时也必须有四份可恢复配置；恢复会保留新安装的依赖包。
 backup_ufw_before_apply() {
-    [[ ! -f $STATE/applied ]] || return 0
+    [[ ! -f $STATE/applied || ${1:-} == force ]] || return 0
     local path name directory="$BACKUP/ufw-before-apply"
     mkdir -m 0700 "$directory"
     for path in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
@@ -290,6 +293,10 @@ The parent backup and absent-before describe the earlier, pre-dependency state.
 Installed packages remain installed; this is not a return to a package-absent system.
 Verify SHA256SUMS before recovery. See docs/hardening.md for the controlled reboot step.
 EOF
+    if [[ ${1:-} == force ]]; then
+        printf '%s\n' 'PRE_REALITY: enabled, already-managed UFW baseline before adding TCP 8443.' \
+          'Verify SHA256SUMS; restore these files, ufw reload, and restore the saved state snapshots.' > "$directory/README"
+    fi
     sync -f "$directory"
 }
 
@@ -447,16 +454,25 @@ configure_firewall() {
     systemctl enable ufw.service > /dev/null
 }
 verify_firewall() {
-    local command chain rules
+    local command chain rules count=2 reality=${1:-0}
+    if [[ -f $STATE/reality-enabled ]]; then
+        safe_root_path "$STATE/reality-enabled"
+        [[ $(cat "$STATE/reality-enabled") == 8443 ]] || die 'Invalid REALITY firewall record.'
+        reality=1
+    fi
+    if (( reality )); then count=3; fi
     ufw status | grep -Fxq 'Status: active' || die 'UFW is not active.'
     grep -Fxq 'IPV6=yes' /etc/default/ufw || die 'UFW IPv6 disabled.'
     for command in iptables-save ip6tables-save; do
         if [[ $command == iptables-save ]]; then chain=ufw-user-input; else chain=ufw6-user-input; fi
         rules=$($command)
         if ! grep -Eq '^:INPUT DROP ' <<< "$rules" || ! grep -Eq '^:FORWARD DROP ' <<< "$rules" || ! grep -Eq '^:OUTPUT ACCEPT ' <<< "$rules"; then die 'Firewall default policies differ.'; fi
-        [[ $(grep -c "^-A $chain " <<< "$rules") == 2 ]] || die 'Unexpected user firewall rules.'
+        [[ $(grep -c "^-A $chain " <<< "$rules") == "$count" ]] || die 'Unexpected user firewall rules.'
         grep -Fxq -- "-A $chain -p tcp -m tcp --dport $SSH_PORT -j ACCEPT" <<< "$rules" || die 'SSH firewall rule missing.'
         grep -Fxq -- "-A $chain -p tcp -m tcp --dport 443 -j ACCEPT" <<< "$rules" || die 'Proxy firewall rule missing.'
+        if (( reality )); then
+            grep -Fxq -- "-A $chain -p tcp -m tcp --dport 8443 -j ACCEPT" <<< "$rules" || die 'REALITY firewall rule missing.'
+        fi
     done
     systemctl is-enabled --quiet ufw.service || die 'UFW boot policy disabled.'
 }
@@ -590,10 +606,38 @@ apply_hardening() {
     say 'Keep old session until another NEW key SSH connection and proxy HTTPS have passed.'
 }
 
+
+# 已完成加固后单独增开本批固定端口。保留当前 SSH/443 规则和所有默认策略。
+# pending 在首次规则写入前持久化；中断后禁止继续 apply，先用本次备份恢复 UFW/记录。
+allow_reality() {
+    require_admin_session
+    [[ $SSH_PORT != 8443 ]] || die 'SSH already uses reserved REALITY port 8443.'
+    [[ -f $STATE/applied && ! -e $STATE/applying ]] || die 'Complete hardening apply before allowing REALITY.'
+    sha256sum -c "$STATE/managed.sha256" > "$WORK/managed-check.log" 2>&1 || die 'Managed resources changed externally.'
+    check_firewall
+    verify_firewall
+    if [[ -f $STATE/reality-enabled ]]; then say 'REALITY TCP 8443 already allowed; rules unchanged.'; return; fi
+    make_backup
+    backup_ufw_before_apply force
+    install -m 0600 "$STATE/ufw-files.sha256" "$BACKUP/ufw-files.sha256"
+    install -m 0600 "$STATE/nft.json" "$BACKUP/nft.json"
+    printf '%s\n' "$BACKUP" > "$STATE/firewall-updating"; sync -f "$STATE"
+    ufw allow 8443/tcp > "$BACKUP/ufw-reality.log" 2>&1
+    verify_firewall 1
+    while read -r path; do sha256sum "$path"; done < <(ufw_files) > "$WORK/ufw-files.sha256"
+    nft_snapshot > "$WORK/nft.json"
+    publish "$WORK/ufw-files.sha256" "$STATE/ufw-files.sha256" 0600
+    publish "$WORK/nft.json" "$STATE/nft.json" 0600
+    printf '8443\n' > "$WORK/reality-enabled"
+    publish "$WORK/reality-enabled" "$STATE/reality-enabled" 0600
+    rm "$STATE/firewall-updating"; sync -f "$STATE"
+    say 'REALITY TCP 8443 allowed in IPv4/IPv6; verify a NEW SSH connection and both proxy paths.'
+}
+
 main() {
     local action=${1:-} option
     if [[ $action == --help || $action == -h ]]; then usage; return; fi
-    [[ $action == prepare || $action == apply ]] || die 'Use prepare or apply; see --help.'
+    [[ $action == prepare || $action == apply || $action == allow-reality ]] || die 'Use prepare, apply or allow-reality; see --help.'
     shift
     while (( $# )); do
         option=$1; shift
@@ -601,7 +645,7 @@ main() {
             --admin) [[ -z $ADMIN && $# -gt 0 ]] || die 'Duplicate/missing admin.'; ADMIN=$1; shift ;;
             --ssh-port) [[ -z $SSH_PORT && $# -gt 0 ]] || die 'Duplicate/missing port.'; SSH_PORT=$1; shift ;;
             --public-key) [[ -z $PUBLIC_KEY && $# -gt 0 && $action == prepare ]] || die 'Unexpected public key option.'; PUBLIC_KEY=$1; shift ;;
-            --confirm-console) [[ $action == apply && $CONSOLE == 0 ]] || die 'Unexpected console confirmation.'; CONSOLE=1 ;;
+            --confirm-console) [[ ( $action == apply || $action == allow-reality ) && $CONSOLE == 0 ]] || die 'Unexpected console confirmation.'; CONSOLE=1 ;;
             *) die 'Unexpected argument; see --help.' ;;
         esac
     done
@@ -614,7 +658,9 @@ main() {
     trap 'exit 130' INT
     trap 'exit 143' TERM
     STEP=preflight; preflight
+    safe_root_path "$STATE/firewall-updating"
+    [[ ! -e $STATE/firewall-updating ]] || die 'Interrupted firewall change; restore its recorded backup before retrying (docs/reality-upgrade.md).'
     STEP=$action
-    if [[ $action == prepare ]]; then prepare_admin; else apply_hardening; fi
+    case "$action" in prepare) prepare_admin ;; apply) apply_hardening ;; allow-reality) allow_reality ;; esac
 }
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then main "$@"; fi
