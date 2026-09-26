@@ -40,6 +40,7 @@ s=s.replace('commit_change() {\n', 'commit_change() {\n    kill -TERM "$$"\n', 1
 Path(sys.argv[2]).write_text(s)
 PY
 reject bash "$WORK/interrupted.sh" upgrade
+grep -Fq 'Previous files restored; local service verification passed' "$WORK/rejection.log"
 [[ $(sha256sum /usr/local/bin/sing-box | cut -d ' ' -f 1) == ce3ed8667dd99ff40c85a8b236075e856ea9cb80731b304cedd2a47187828120 ]]
 [[ $(sha256sum /etc/sing-box/config.json) == "$CONFIG_BEFORE" ]]
 [[ ! -e /var/lib/sing-box-maintenance/pending ]]
@@ -74,6 +75,7 @@ HANDSHAKE=$!; wait_port 19443
 python3 "$ROOT/tests/https_fixture.py" "$WORK/tls.crt" "$WORK/tls.key" > "$WORK/origin.log" 2>&1 &
 ORIGIN=$!; wait_port 18443
 reject bash "$WORK/interrupted.sh" reality --handshake-server 127.0.0.1 --server-name localhost --handshake-port 19443
+grep -Fq 'Previous files restored; local service verification passed' "$WORK/rejection.log"
 [[ $(sha256sum /etc/sing-box/config.json) == "$CONFIG_BEFORE" ]]
 [[ -z $(ss -H -ltn 'sport = :8443') ]]
 pass 'TERM after REALITY config publication restores original SS2022 service'

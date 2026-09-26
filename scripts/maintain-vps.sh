@@ -180,7 +180,11 @@ preflight() {
     [[ $(timedatectl show -p NTPSynchronized --value) == yes ]] || die 'Existing time service is not synchronized.'
     validate_config "$CONFIG"
     healthy || die 'Start from a healthy service before maintenance.'
-    WORK=$(mktemp -d /run/sing-box-maintain.XXXXXXXX)
+    # 1 GiB VM 的 /run 往往只有约 100 MiB，容不下包与 90 MiB 程序；使用磁盘临时目录。
+    local available
+    available=$(df -B1 --output=avail /var/tmp | tail -n 1)
+    (( available >= 512 * 1024 * 1024 )) || die 'At least 512 MiB free staging space is required.'
+    WORK=$(mktemp -d /var/tmp/sing-box-maintain.XXXXXXXX)
     chown root:sing-box "$WORK"; chmod 0750 "$WORK"
 }
 

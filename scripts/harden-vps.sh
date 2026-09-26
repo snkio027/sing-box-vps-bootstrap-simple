@@ -275,7 +275,7 @@ install_dependencies() {
 # 这是依赖安装后的回滚基线，不覆盖 make_backup 的安装前文件/absent-before。
 # 初始未安装 UFW 时也必须有四份可恢复配置；恢复会保留新安装的依赖包。
 backup_ufw_before_apply() {
-    [[ ! -f $STATE/applied ]] || return 0
+    [[ ! -f $STATE/applied || ${1:-} == force ]] || return 0
     local path name directory="$BACKUP/ufw-before-apply"
     mkdir -m 0700 "$directory"
     for path in /etc/default/ufw /etc/ufw/ufw.conf /etc/ufw/user.rules /etc/ufw/user6.rules; do
@@ -293,6 +293,10 @@ The parent backup and absent-before describe the earlier, pre-dependency state.
 Installed packages remain installed; this is not a return to a package-absent system.
 Verify SHA256SUMS before recovery. See docs/hardening.md for the controlled reboot step.
 EOF
+    if [[ ${1:-} == force ]]; then
+        printf '%s\n' 'PRE_REALITY: enabled, already-managed UFW baseline before adding TCP 8443.' \
+          'Verify SHA256SUMS; restore these files, ufw reload, and restore the saved state snapshots.' > "$directory/README"
+    fi
     sync -f "$directory"
 }
 
@@ -614,7 +618,7 @@ allow_reality() {
     verify_firewall
     if [[ -f $STATE/reality-enabled ]]; then say 'REALITY TCP 8443 already allowed; rules unchanged.'; return; fi
     make_backup
-    backup_ufw_before_apply
+    backup_ufw_before_apply force
     install -m 0600 "$STATE/ufw-files.sha256" "$BACKUP/ufw-files.sha256"
     install -m 0600 "$STATE/nft.json" "$BACKUP/nft.json"
     printf '%s\n' "$BACKUP" > "$STATE/firewall-updating"; sync -f "$STATE"
