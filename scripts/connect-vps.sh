@@ -213,15 +213,17 @@ owns_listener() {
 # 保留正常 TLS 验证，不跟随重定向，并限制连接时间、总时间和响应体大小。
 # 结果同时要求 HTTP 200、固定标记和 ip 字段；只输出通过结论，不打印公网地址。
 probe_https() {
-    local code
+    local code expected
+    expected=$(json_get "$WORK/client.json" outbounds.0.server)
     code=$(curl -q --silent --show-error --noproxy '' --proxy socks5h://127.0.0.1:17890 \
         --connect-timeout 8 --max-time 20 --max-filesize 65536 --output "$WORK/response" \
         --write-out '%{http_code}' https://www.cloudflare.com/cdn-cgi/trace 2>> "$LOG") ||
         die "HTTPS request failed; inspect privately: $LOG"
     if [[ $code != 200 ]] || ! grep -Fxq 'h=www.cloudflare.com' "$WORK/response" ||
-        ! grep -Eq '^ip=.+$' "$WORK/response"; then die 'HTTPS target returned an unexpected status/body.'; fi
+        [[ $(grep -c '^ip=' "$WORK/response") != 1 ]] ||
+        ! grep -Fxq "ip=$expected" "$WORK/response"; then die 'HTTPS status/body or VPS exit address did not match.'; fi
     if ! kill -0 "$CHILD" 2>/dev/null || ! owns_listener; then die 'Client stopped during HTTPS verification.'; fi
-    say 'PASS: SS2022 HTTPS request, HTTP 200 and expected response; TLS verification enabled.'
+    say 'PASS: SS2022 HTTPS, HTTP 200, verified TLS and expected VPS exit address.'
 }
 
 # 参数在任何依赖查询或状态目录修改之前校验；帮助可独立查看。
@@ -249,6 +251,10 @@ main() {
         [[ $(json_get "$3" inbounds.0.listen_port 2>/dev/null) == 443 ]] || die 'Source VPS configuration must use port 443.'
         check_interface "$interface"
         check_config
+        if [[ -f $CONFIG ]] && cmp -s "$WORK/client.json" "$CONFIG"; then
+            say 'Client configuration unchanged; original file and previous backup retained.'
+            return
+        fi
         # 只有新配置检查成功才保留旧配置并替换；临时目录与目标目录在同一文件系统。
         # 仅保留上一份客户端配置，不构建历史事务或自动恢复引擎。
         if [[ -f $CONFIG ]]; then

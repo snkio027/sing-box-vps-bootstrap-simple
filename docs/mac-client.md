@@ -36,27 +36,27 @@ sing-box 由 Homebrew 选择适合当前 macOS 的包，并负责下载校验，
 
 ## 2. 导入 VPS 配置
 
-下载 `connect-vps.sh`。先按 [最小私密交接](private-handoff.md) 在服务器生成 SS2022 字段投影，
-通过已核验 host key 的 SSH＋sudo 只取回该投影，保存为 Mac 的 `~/Downloads/vps-config.json`。
+使用 [最小私密交接](private-handoff.md) 的 `fetch-vps-config.sh` 取回 SS2022 投影到新建私密目录，
+再单独执行下面的 setup；也可按同页说明人工交接。本文示例假定保存为 `~/vps-private/ss2022.json`。
 不要下载整份服务端配置：双协议配置还包含客户端不需要的 REALITY 私钥。
 投影文件仍含 SS2022 密钥，不要发到聊天、Git 或公开日志。
 
 把下面的 `VPS_IP` 换成 VPS 的公网数字 IPv4 地址：
 
 ```bash
-chmod 600 "$HOME/Downloads/vps-config.json"
-/opt/homebrew/bin/bash connect-vps.sh setup VPS_IP "$HOME/Downloads/vps-config.json"
+chmod 600 "$HOME/vps-private/ss2022.json"
+/opt/homebrew/bin/bash connect-vps.sh setup VPS_IP "$HOME/vps-private/ss2022.json"
 ```
 
 默认绑定之前已确认的物理网卡 `en4`。换网卡时，在 setup 最后明确指定，例如：
 
 ```bash
-/opt/homebrew/bin/bash connect-vps.sh setup VPS_IP "$HOME/Downloads/vps-config.json" en0
+/opt/homebrew/bin/bash connect-vps.sh setup VPS_IP "$HOME/vps-private/ss2022.json" en0
 ```
 
 setup 导入原密钥并用当前 sing-box 检查配置。连接设置保存在
 `~/Library/Application Support/sing-box-vps/client.json`，权限为 600。
-重复 setup 检查成功后替换，保留一份 `client.previous.json`；不会重新生成服务端密钥。
+重复 setup 相同配置时保留原文件和备份；只有内容变化且检查通过才替换，并保留一份 `client.previous.json`。不会生成新服务端密钥。
 
 ## 3. 启动或检查
 
@@ -88,7 +88,7 @@ setup 导入原密钥并用当前 sing-box 检查配置。连接设置保存在
 运行前重建固定配置并检查，不会把保存文件中额外的 TUN 或 direct 字段带入运行配置。
 
 HTTPS 检查使用 `socks5h` 请求 `https://www.cloudflare.com/cdn-cgi/trace`，保留正常 TLS 证书和
-主机名验证，要求 HTTP 200、`h=www.cloudflare.com` 和 `ip=` 字段；不打印公网地址。
+主机名验证，要求 HTTP 200、`h=www.cloudflare.com`，以及唯一 `ip=` 等于配置中的 VPS IPv4；不打印公网地址。
 它验证一次连通性，不测延迟、吞吐或长期稳定性；目标站故障也可能使检查失败。
 
 - 端口 17890 已占用：先关闭占用它的客户端。check 模式也需要独占该端口。
@@ -115,8 +115,8 @@ static、mac-client、vm 三个 job 均 success。Mac job 在 macOS 26 更新 Ho
 
 本脚本从 setup 到 run/check 的真实公网完整流程仍为 **NOT RUN**。已有的独立临时客户端、
 以及当前固定 1.14.0 TUN 后台均完成了实际 HTTPS 验证，但不能替代这个脚本自身的端到端验收。
-本脚本的检查仅确认响应具有 `ip=` 字段，不比较它是否等于用户提供的 VPS IPv4；
-现场完整 TUN 验证另有出口相等检查及 en4 socket 观测。
+2026-10-16 起，脚本已增加出口相等检查；隔离 VM 的组合验证与 Mac 物理链路范围见
+[私密交接验证](private-handoff-validation.md)。旧现场 TUN 证据不替代本入口的新验证。
 
 早期依赖不全或尚未触发 CI 的记录保留在 [历史验证记录](validation.md) 和
 [注释与独立建仓记录](commentary-validation.md)。公开仓库不包含真实配置或连接文件。

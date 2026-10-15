@@ -14,6 +14,13 @@ The previous controller, schemas and ADRs are historical at commit
 - Read this file, README.md and relevant script/tests before editing.
 - Ship `scripts/prepare-vps.sh` as one Bash file, without a build step or Python runtime.
 - Ship `scripts/connect-vps.sh` as one Bash file for Apple Silicon macOS.
+- Ship `scripts/fetch-vps-config.sh` as a separate Mac Bash entry. It reads only an
+  SS2022 allowlist over pinned-host-key SSH and sudo; no password prompt, remote
+  export file, REALITY private-key transfer or automatic client activation.
+  Require a private output directory and exclusive publication; existing outputs
+  always fail. Import remains a separate connect-vps.sh setup call.
+  Disposable Linux tests may adapt Mac platform functions/loopback transport only
+  in test wrappers, never with a production bypass flag.
 - Ship `scripts/harden-vps.sh` as a separate Ubuntu Bash entry with `prepare` and
   `apply` calls. prepare creates/validates only the target key administrator; apply
   runs from a new administrator SSH/sudo session after console access is confirmed.

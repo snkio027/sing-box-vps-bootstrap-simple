@@ -20,7 +20,7 @@ VPS 安装已有通用脚本；操作者 Mac 已完成 1.14.0 完整 TUN 和 lau
 使用与恢复见 [初始化说明](docs/hardening.md)，测试范围见 [验证记录](docs/hardening-validation.md)。
 
 新主机按初始化、下面的代理安装、私密客户端交接和链路/重启验证顺序部署。
-私密取回与完整组合部署仍待第二批，见 [开发计划](docs/next-steps.md)。
+私密取回入口和干净 VM 组合测试已提供，见 [交接说明](docs/private-handoff.md) 与 [验证状态](docs/private-handoff-validation.md)。
 
 ## 升级与新增协议
 
@@ -98,7 +98,8 @@ systemctl restart sing-box
 
 ## Mac 客户端
 
-配套的 `scripts/connect-vps.sh` 是独立 Bash 文件：私密导入服务端配置，启动本机 SOCKS5，
+配套的 `scripts/fetch-vps-config.sh` 通过已核验 SSH 身份只取回 SS2022 最小投影。
+再由独立 `scripts/connect-vps.sh` 私密导入，启动本机 SOCKS5，
 绑定 en4 并验证一次 HTTPS。Apple Silicon Mac；Bash、curl、jq、OpenSSL 和 sing-box
 使用 Homebrew 当前稳定版，明确使用 Homebrew 工具路径。无需 sudo 或 Python。
 使用方法与限制见 [Mac 客户端说明](docs/mac-client.md)。
@@ -127,7 +128,9 @@ python3 -B tests/client_profiles_test.py
 GitHub Actions 在一次性 Ubuntu 24.04 VM（1 GiB / 20 GiB）中运行真实安装、系统升级、重复执行、
 SS2022 HTTPS、错误密钥和端口冲突检查，并覆盖缺少 AF_NETLINK 的启动失败及重复安装修复。
 Python 仅用于此测试环境和本地 HTTPS 测试服务。
-`tests/run_vm.py` 只复制三个明确列出的源文件，绝不分享整个工作区。
+VM 驱动只复制明确列出的源文件和合成夹具，绝不分享整个工作区。
+新增 `tests/run_deployment_vm.py` 在同一干净 VM 串起初始化、安装、取回、导入、HTTPS、重复执行与受控重启；
+Linux 外部客户端的平台适配范围和实际结果见 [组合验证](docs/private-handoff-validation.md)。
 
 验证结果与范围见 [docs/validation.md](docs/validation.md)。重建决定与旧实现位置见
 [docs/reset.md](docs/reset.md)。
