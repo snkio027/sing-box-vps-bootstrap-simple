@@ -125,6 +125,7 @@ runcmd:
             args = base + ['-i', str(identity), '-o', 'PreferredAuthentications=' + auth]
             if auth != 'publickey':
                 args += ['-o', 'PubkeyAuthentication=no', '-o', 'LogLevel=DEBUG1']
+            cmd = 'set -e; ' + cmd
             args += [user + '@127.0.0.1', cmd]
             p = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
             executions.append({'label': label or cmd, 'user': user, 'command': cmd, 'auth': auth,
@@ -323,6 +324,16 @@ main "$@"'''))
             assert not (private_output / 'unfinished.json').exists()
             ssh('sudo -n rm /var/lib/sing-box/install-restart-required', user=ADMIN, label='remove only synthetic marker')
             passed('remote read refuses unfinished installer state')
+            ssh("sudo -n systemd-run --unit=fixture-export-lock --property=RuntimeMaxSec=15 "
+                "/usr/bin/flock -x /run/lock/sing-box-install.lock /usr/bin/bash -c "
+                "'touch /run/fixture-export-lock-held; sleep 12'; "
+                "for n in $(seq 1 30); do test ! -e /run/fixture-export-lock-held || break; sleep 0.1; done; "
+                "test -e /run/fixture-export-lock-held", user=ADMIN, label='hold installer lock in guest-only fixture')
+            fetch('busy.json', expected=1)
+            assert not (private_output / 'busy.json').exists()
+            ssh('sudo -n systemctl stop fixture-export-lock; sudo -n rm /run/fixture-export-lock-held',
+                user=ADMIN, label='release only the test-owned lock holder')
+            passed('active exclusive installer lock blocks shared export without publishing')
             # Real wrong-key connection proves the probe cannot bypass the proxy.
             import base64
             projection['inbounds'][0]['password'] = base64.b64encode(os.urandom(16)).decode()
@@ -353,8 +364,11 @@ main "$@"'''))
                 'systemctl is-active --quiet apt-daily.timer; systemctl is-active --quiet apt-daily-upgrade.timer; '
                 'sudo -n apt-config dump | grep -F \'Unattended-Upgrade::Automatic-Reboot "false";\'', user=ADMIN, label='post-reboot services and update policy')
             ssh('true', expected=255, label='post-reboot root denied')
+            ssh('true', user=ADMIN, auth='password', expected=255, label='post-reboot password denied')
             assert snapshot() == before
+            ssh('sudo -n test ! -e /run/lock/sing-box-install.lock', user=ADMIN, label='prove runtime lock cleared by reboot')
             fetch('after-reboot.json')
+            assert ssh("sudo -n stat -c '%u:%a:%h:%s' /run/lock/sing-box-install.lock", user=ADMIN).strip() == '0:600:1:0'
             assert (private_output / 'after-reboot.json').read_bytes() == first
             probe()
             passed('controlled reboot preserves fresh SSH/sudo, UFW, daily updates, credentials and real proxy HTTPS')

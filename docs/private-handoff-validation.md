@@ -32,5 +32,9 @@ HTTPS origin 只在 guest 回环可达并回报实际 peer，错误 SS2022 密�
 
 ## 执行结果
 
-本机新 8 组测试 PASS；语法与 ShellCheck PASS。CI、完整 VM、Mac CI：**NOT RUN**，待推送实跑后更新。
+本机新 9 组测试 PASS；语法与 ShellCheck PASS。CI、完整 VM、Mac CI：**NOT RUN**，待推送实跑后更新。
 真实 VPS、Mac 网络/服务变更、手机与 REALITY 自动导出：**NOT RUN**。
+
+首轮 `d528cf7` / CI `38788210144`：静态、Mac 和原安装 VM 已通过，新组合 VM 完成取回、HTTPS、重复执行，
+在重启后的再次取回失败。原因是 `/run` 锁不跨重启保留；已修订为只安全重建零字节运行时锁。
+本轮失败不记为完整部署 PASS，最终版本另行实跑。
