@@ -1,5 +1,8 @@
 # 下一阶段：复现单台主机的完整部署
 
+2026-10-16：SS2022 私密取回入口、重复导入和干净 VM 组合测试已实现；当前执行结果见
+[交接验证](private-handoff-validation.md)。Mac 物理链路、手机和真实目标继续单独验收。以下日期段落保留原计划。
+
 2026-09-26 补充：用户将版本升级和 REALITY 提前，独立维护入口及候选配置已实现，
 见 [升级批次](reality-upgrade.md) 与 [验证状态](reality-validation.md)。下文保留原分批计划的历史时间点；
 私密取回和 APT 迁移仍未实现，新版本真实部署仍需另行验收。
@@ -63,7 +66,7 @@
 [多平台客户端](client-platforms.md)。三端公开模板与平台约束检查已实现；移动实机测试仍为 NOT RUN，
 不自动替换现用代理。此配置交付不代表下面的 SSH 私密取回入口或完整组合部署已经完成。
 
-拟新增小型 Mac Bash 入口 `scripts/fetch-vps-config.sh`，接收目标 IPv4、SSH 端口、管理员、
+已新增小型 Mac Bash 入口 `scripts/fetch-vps-config.sh`，接收目标 IPv4、SSH 端口、管理员、
 本机身份文件路径、已确认的主机密钥记录、物理网卡及输出路径。接口细节随实现和合成测试定稿。
 
 通过固定身份检查的 SSH 和 `sudo -n` 在服务端仅投影客户端必要字段（见 [交接约束](private-handoff.md)）；

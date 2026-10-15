@@ -103,6 +103,7 @@ fi
 
 # Synthetic curl contract, no network: assert proxy/DNS bypass settings and validate rejection paths.
 LOG="$TEMP/client.log"
+cp "$TEMP/client.json" "$WORK/client.json"
 # 仅在本测试进程里替换 listener/curl；生产脚本并没有这些测试替身。
 # CHILD 使用当前测试 PID 供 kill -0 检查，结束前清空，避免误用生产清理函数。
 CHILD=$$
@@ -123,10 +124,12 @@ curl() {
         status) printf 503 ;;
         marker) printf 'unexpected\n' > "$output"; printf 200 ;;
         network) return 7 ;;
+        wrong_exit) printf 'h=www.cloudflare.com\nip=198.51.100.8\n' > "$output"; printf 200 ;;
+        duplicate_exit) printf 'h=www.cloudflare.com\nip=203.0.113.7\nip=198.51.100.8\n' > "$output"; printf 200 ;;
     esac
 }
 probe_https > "$TEMP/probe-output"
-for PROBE_CASE in status marker network; do reject probe_https; done
+for PROBE_CASE in status marker network wrong_exit duplicate_exit; do reject probe_https; done
 CHILD=''
 unset -f curl owns_listener
 pass 'HTTPS check requires forced SOCKS5, TLS verification, HTTP 200 and expected body'

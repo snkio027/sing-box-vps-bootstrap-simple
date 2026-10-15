@@ -22,6 +22,7 @@ jobs:
       - run: python3 -B tests/reality_profiles_test.py
       - run: bash tests/maintenance-unit.sh
       - run: python3 -B tests/profile_check_test.py
+      - run: python3 -B tests/fetch_test.py
       - run: bash tests/handoff-unit.sh
   mac-client:
     runs-on: macos-26
@@ -56,6 +57,7 @@ jobs:
       - run: brew update && brew install --formula bash curl jq openssl sing-box && brew upgrade --formula --no-ask bash curl jq openssl sing-box
       - run: /opt/homebrew/bin/bash -n scripts/connect-vps.sh
       - run: /opt/homebrew/bin/bash tests/client-unit.sh
+      - run: python3 -B tests/fetch_test.py
       - name: Check current Homebrew stable compatibility without starting TUN
         run: python3 -B tests/check_client_profiles.py --binary /opt/homebrew/bin/sing-box --mode compatibility
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -114,5 +116,24 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: artifacts/${{ matrix.artifact }}/
+          if-no-files-found: warn
+          retention-days: 14
+  deployment-vm:
+    needs: static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Install disposable full-deployment test dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils cloud-image-utils jq curl openssl netcat-openbsd lsof
+      - name: Clean VM prepare, fresh SSH, harden, install, private fetch, import, HTTPS, repeat and reboot
+        run: sudo python3 -B tests/run_deployment_vm.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: deployment-vm
+          path: artifacts/deployment-vm/
           if-no-files-found: warn
           retention-days: 14
