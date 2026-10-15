@@ -1,0 +1,437 @@
+{
+  "revision": "e3e1409087ed78966686327d0b80db11f7e00d0e",
+  "ci": "https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/38789768607",
+  "checked_on": "2026-10-16",
+  "result": "PASS",
+  "static_assertion_count": 67,
+  "local": {
+    "environment": "Darwin 25.6 arm64 / Python 3.9.6 / Homebrew Bash 5.3.20 / ShellCheck 0.11.0",
+    "focused_tests_or_groups": 48,
+    "exit_code": 0,
+    "native_1_14_2_config_checks": 4
+  },
+  "vm": [
+    {
+      "scenario": "simple-vm-result",
+      "exit_code": 0,
+      "assertion_count": 22,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "architecture": "amd64",
+      "acceleration": "kvm",
+      "source_sha256": {
+        "scripts/prepare-vps.sh": "42d53a1c19af8cc4a3b2fbf5fdd0fce50e4684dd8e45462d8e69cd4e119a5049",
+        "scripts/maintain-vps.sh": "2cc6cc157bd8305671235938eb1f059aa1689a72aeeb49397155c4c4d3d8add2",
+        "tests/integration.sh": "4cb2aaa344c1820624c7a733ae29648290616a58fb1de4f58bd2c5b6c8f64451",
+        "tests/maintenance-integration.sh": "89c63cb25d1dbdf8c9447573b4861bba7fef5f8ec7cc35a9a249a084a1298ff1",
+        "tests/https_fixture.py": "3ed61de40122f7ebf8f911a1f212e322e3d8c0c4551b809deef4e60791bcb039"
+      }
+    },
+    {
+      "scenario": "hardening-vm-socket",
+      "exit_code": 0,
+      "assertion_count": 20,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "architecture": "amd64",
+      "acceleration": "kvm",
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "tests/run_hardening_vm.py": "f7dcce5fe051edbad9960dfc79117cf7b2f95c2b7afa0812ac4311b0e1140c1b",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      }
+    },
+    {
+      "scenario": "hardening-vm-service",
+      "exit_code": 0,
+      "assertion_count": 19,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "architecture": "amd64",
+      "acceleration": "kvm",
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "tests/run_hardening_vm.py": "f7dcce5fe051edbad9960dfc79117cf7b2f95c2b7afa0812ac4311b0e1140c1b",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      }
+    },
+    {
+      "scenario": "hardening-vm-socket-without-ufw",
+      "exit_code": 0,
+      "assertion_count": 16,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "architecture": "amd64",
+      "acceleration": "kvm",
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "tests/run_hardening_vm.py": "f7dcce5fe051edbad9960dfc79117cf7b2f95c2b7afa0812ac4311b0e1140c1b",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      }
+    },
+    {
+      "scenario": "deployment-vm",
+      "exit_code": 0,
+      "assertion_count": 15,
+      "memory_mib": 1024,
+      "disk_bytes": 21474836480,
+      "architecture": "amd64",
+      "acceleration": "kvm",
+      "source_sha256": {
+        "scripts/harden-vps.sh": "73f500f5bb99666788c179ff46c24e99fc6a7e3d1bf66ee626bcdeaeb4310e29",
+        "scripts/prepare-vps.sh": "42d53a1c19af8cc4a3b2fbf5fdd0fce50e4684dd8e45462d8e69cd4e119a5049",
+        "scripts/fetch-vps-config.sh": "cd80d95ca62222e639b86b34040f58a4628ff4dbc77acebd5e650d8a52d3b358",
+        "scripts/connect-vps.sh": "d13612b36b56a820863e9d3c94263dc1d7197461a5d0b0f4edaa931d7e5c5b81",
+        "tests/deployment_origin.py": "a63a8d4b7dbd8d3f4bcdcc3288363aa4fc74affd01b09119cdc53ea914176103",
+        "tests/run_deployment_vm.py": "c76977e5b1c84353e887b9226fb40512521f32ff53172e2b7a73f391525f468c",
+        "tests/fixtures/ubuntu-cloud-image.json": "24a98767febc0a76f6fe1012dee5180ebf72b6ed240bb3cadf6fae97f3a18e28"
+      },
+      "controlled_reboots": 1,
+      "scope": "Clean guest full SS2022 deployment; external Linux client with explicit Mac platform adapters",
+      "assertions": [
+        "clean Ubuntu 24.04 socket VM, pinned host key, no previous project installation",
+        "separate prepare and new external administrator SSH/sudo",
+        "hardening retains fresh key SSH; root/password denied; UFW enabled",
+        "real prepare-vps installation after host initialization",
+        "real pinned SSH plus sudo retrieves only SS2022 fields as exclusive private file",
+        "production client import and real SS2022 HTTPS with TLS verification and observed guest-loopback exit",
+        "real host-key mismatch cannot publish an output",
+        "real SSH nonzero after valid payload prevents publication and cleans temporary files",
+        "authenticated user without passwordless sudo cannot fetch or publish",
+        "remote read refuses unfinished installer state",
+        "active exclusive installer lock blocks shared export without publishing",
+        "wrong SS2022 key cannot obtain the HTTPS trace",
+        "repeat prepare/apply/install preserves credentials, account, firewall and healthy proxy PID",
+        "repeat fetch refuses existing output; new export and repeated import preserve key/config inode",
+        "controlled reboot preserves fresh SSH/sudo, UFW, daily updates, credentials and real proxy HTTPS"
+      ],
+      "command_results": [
+        {
+          "label": "set -e; cloud-init status --wait >/dev/null; test ! -e /usr/local/bin/sing-box; test ! -e /var/lib/sing-box-hardening",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "prepare administrator",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "fresh administrator SSH and full sudo",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "apply hardening",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "new connection after hardening",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "root login denied",
+          "exit": 255,
+          "expected": 255
+        },
+        {
+          "label": "password authentication denied",
+          "exit": 255,
+          "expected": 255
+        },
+        {
+          "label": "install proxy after hardening",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "set -e; systemctl is-active --quiet sing-box; systemctl is-enabled --quiet sing-box",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "create private guest-loopback TLS origin",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "retrieve synthetic public CA",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch first.json",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "client setup",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "real SS2022 HTTPS and observed guest egress",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch host-mismatch.json",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "real SSH nonzero after complete payload",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "create fixture user without sudo",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "fixture key login succeeds without sudo",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch sudo-denied.json",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "synthetic unfinished install",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch unfinished.json",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "remove only synthetic marker",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "hold installer lock in guest-only fixture",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch busy.json",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "release only the test-owned lock holder",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "client setup",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "real SS2022 HTTPS and observed guest egress",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "client setup",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private comparison of config/key/account/firewall",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "set -e; systemctl show sing-box -p MainPID --value",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "repeat prepare",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "repeat hardening",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "repeat proxy installer",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private comparison of config/key/account/firewall",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "set -e; systemctl show sing-box -p MainPID --value",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch first.json",
+          "exit": 1,
+          "expected": 1
+        },
+        {
+          "label": "private fetch repeat.json",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "client setup",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "real SS2022 HTTPS and observed guest egress",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "set -e; cat /proc/sys/kernel/random/boot_id",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "one controlled reboot after complete deployment",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "wait for new boot",
+          "exit": 255,
+          "expected": 0
+        },
+        {
+          "label": "wait for new boot",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "post-reboot services and update policy",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "post-reboot root denied",
+          "exit": 255,
+          "expected": 255
+        },
+        {
+          "label": "post-reboot password denied",
+          "exit": 255,
+          "expected": 255
+        },
+        {
+          "label": "private comparison of config/key/account/firewall",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "prove runtime lock cleared by reboot",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "private fetch after-reboot.json",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "set -e; sudo -n stat -c '%u:%a:%h:%s' /run/lock/sing-box-install.lock",
+          "exit": 0,
+          "expected": 0
+        },
+        {
+          "label": "real SS2022 HTTPS and observed guest egress",
+          "exit": 0,
+          "expected": 0
+        }
+      ],
+      "reboot_poll_note": "One SSH attempt during reboot returned 255; the bounded retry then returned 0 and verified a new boot ID."
+    }
+  ],
+  "mac_config_checks": [
+    {
+      "mode": "reviewed",
+      "reviewed_core": "1.14.2",
+      "tested_core": "1.14.2",
+      "environment": {
+        "system": "Darwin",
+        "release": "25.6.0",
+        "machine": "arm64",
+        "python": "3.14.7"
+      },
+      "source_sha256": {
+        "examples/1.14.2/client-versions.json": "8dd5dfb1e55f9d36455dc1495ec639f274ae962dfbcefa4b8c0b47204a7f4140",
+        "tests/check_client_profiles.py": "b2b953cd6d98d79823e08240879bd1c77652fe29083a46690f8ea6c373bb4cc6",
+        "tests/client_profiles_test.py": "56c6d009738843bdd5a5b72a9d37265c84c9a9294931b08eed74e461192512da",
+        "examples/1.14.2/server.example.json": "4e9fbb44b6b71c9774898d6b5dce227d1fb3d179a85c78ebb09273bae363b3bd",
+        "examples/1.14.2/macos.example.json": "ef05fc3493cde655080089dd4970b164ba3508b51965808ed6e494350d5afdfa",
+        "examples/1.14.2/android.example.json": "be91d3a2e7db455dbc654d0c0eb3ed0eac818b4cd846cac8c880fe6dab9eb499",
+        "examples/1.14.2/ios.example.json": "f629a4eb835060e638ba925977fe0069980bfa121588e0e7b3a33892f5651393"
+      },
+      "exit_codes": {
+        "server": 0,
+        "macos": 0,
+        "android": 0,
+        "ios": 0
+      }
+    },
+    {
+      "mode": "compatibility",
+      "reviewed_core": "1.14.2",
+      "tested_core": "1.14.3",
+      "environment": {
+        "system": "Darwin",
+        "release": "25.6.0",
+        "machine": "arm64",
+        "python": "3.14.7"
+      },
+      "source_sha256": {
+        "examples/1.14.2/client-versions.json": "8dd5dfb1e55f9d36455dc1495ec639f274ae962dfbcefa4b8c0b47204a7f4140",
+        "tests/check_client_profiles.py": "b2b953cd6d98d79823e08240879bd1c77652fe29083a46690f8ea6c373bb4cc6",
+        "tests/client_profiles_test.py": "56c6d009738843bdd5a5b72a9d37265c84c9a9294931b08eed74e461192512da",
+        "examples/1.14.2/server.example.json": "4e9fbb44b6b71c9774898d6b5dce227d1fb3d179a85c78ebb09273bae363b3bd",
+        "examples/1.14.2/macos.example.json": "ef05fc3493cde655080089dd4970b164ba3508b51965808ed6e494350d5afdfa",
+        "examples/1.14.2/android.example.json": "be91d3a2e7db455dbc654d0c0eb3ed0eac818b4cd846cac8c880fe6dab9eb499",
+        "examples/1.14.2/ios.example.json": "f629a4eb835060e638ba925977fe0069980bfa121588e0e7b3a33892f5651393"
+      },
+      "exit_codes": {
+        "server": 0,
+        "macos": 0,
+        "android": 0,
+        "ios": 0
+      }
+    }
+  ],
+  "vm_assertion_count": 92,
+  "verified_source_digest_entries": 35,
+  "complete_deployment": "PASS within disposable Ubuntu VM and external Linux test adapter scope",
+  "real_vps": "NOT RUN",
+  "mac_network_or_service_changes": "NOT RUN",
+  "mac_physical_interface": "NOT RUN",
+  "public_egress": "NOT RUN",
+  "mobile_devices": "NOT RUN",
+  "reality_automatic_export": "NOT IMPLEMENTED",
+  "first_run": {
+    "revision": "d528cf77eed58d49d77d1f40eaf88ba706e9660f",
+    "ci": "https://github.com/snkio027/sing-box-vps-bootstrap-simple/actions/runs/38788210144",
+    "result": "FAIL",
+    "reason": "post-reboot fetch refused missing runtime lock; corrected and rerun on the reviewed revision"
+  }
+}
