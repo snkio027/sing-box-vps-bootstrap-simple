@@ -129,10 +129,17 @@ remote_script() {
 set +x
 set -Eeuo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C
-# 与安装/维护共用已有锁；不创建服务端配置、导出文件或状态。
-exec 9< /run/lock/sing-box-install.lock
+# 重启会清空 /run。只允许排他新建零字节运行时锁；不创建持久配置/导出文件。
+lock=/run/lock/sing-box-install.lock
+if [[ ! -e $lock && ! -L $lock ]]; then
+    (umask 077; set -o noclobber; : > "$lock") 2>/dev/null || true
+fi
+[[ -f $lock && ! -L $lock && $(stat -c '%u:%a:%h:%s' "$lock") == 0:600:1:0 ]]
+exec 9< "$lock"
 flock -s -w 5 9
-[[ ! -e /var/lib/sing-box-maintenance/pending && ! -e /var/lib/sing-box/install-restart-required ]]
+for marker in /var/lib/sing-box-maintenance/pending /var/lib/sing-box/install-restart-required; do
+    [[ ! -e $marker && ! -L $marker ]]
+done
 [[ ! -L /etc/sing-box && -f /etc/sing-box/config.json && ! -L /etc/sing-box/config.json ]]
 [[ $(stat -c '%U:%G:%a:%h' /etc/sing-box/config.json) == root:sing-box:640:1 ]]
 jq -e -s '

@@ -17,8 +17,8 @@ class FetchTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='fetch-test-')
         self.addCleanup(self.temp.cleanup)
-        self.work = Path(self.temp.name).resolve()
-        self.work.chmod(0o700)
+        self.work = Path(self.temp.name).resolve() / 'private space'
+        self.work.mkdir(mode=0o700)
         self.identity = self.work / 'identity'
         subprocess.run(['ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', str(self.identity)], check=True)
         self.known = self.work / 'known hosts'
@@ -46,7 +46,7 @@ fetch_projection() {
 eval "$(declare -f publish_projection | sed '1s/publish_projection/original_publish/')"
 publish_projection() {
   case "$FIXTURE_MODE" in
-    race_file) printf original > "$OUTPUT" ;;
+    race_file) bash -c 'printf original > "$1"' _ "$OUTPUT" ;;
     race_dir) mkdir "$OUTPUT" ;;
     race_link) ln -s "$FIXTURE_INPUT" "$OUTPUT" ;;
   esac
@@ -133,6 +133,14 @@ main "$@"
             self.call(values={index: value}, expected=1)
         self.call(values={0: '203.0.113.8'}, expected=1)
         self.assertFalse(self.output.exists())
+
+    def test_port_specific_and_hashed_known_hosts(self):
+        self.known.write_text(self.known.read_text().replace('203.0.113.7 ', '[203.0.113.7]:2222 '))
+        self.call(values={1: '2222'})
+        self.output.unlink()
+        subprocess.run(['ssh-keygen', '-H', '-f', str(self.known)], capture_output=True, check=True)
+        self.call(values={1: '2222'})
+        self.assertTrue(self.output.is_file())
 
     def test_actual_ssh_argument_policy_without_connecting(self):
         script = '''source "$1/scripts/fetch-vps-config.sh"

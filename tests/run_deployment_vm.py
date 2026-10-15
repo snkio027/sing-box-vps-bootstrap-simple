@@ -200,7 +200,7 @@ curl() {
 main "$@"
 ''')
         client_home = work / 'client-home'; client_home.mkdir(mode=0o700)
-        private_output = work / 'private-output'; private_output.mkdir(mode=0o700)
+        private_output = work / 'private output'; private_output.mkdir(mode=0o700)
         env = dict(os.environ, HOME=str(client_home), FIXTURE_SSH_PORT=str(port),
                    FIXTURE_PROXY_PORT=str(proxy_port), FIXTURE_CORE=str(work / 'sing-box'), FIXTURE_CA=str(work / 'origin.crt'))
 
@@ -301,6 +301,15 @@ ORIGIN
             fetch('host-mismatch.json', known='wrong-known', expected=1)
             assert not (private_output / 'host-mismatch.json').exists()
             passed('real host-key mismatch cannot publish an output')
+            broken = work / 'failed-transfer.sh'
+            broken.write_text(fetch_wrapper.read_text().replace('main "$@"', '''eval "$(declare -f remote_script | sed '1s/remote_script/normal_remote_script/')"
+remote_script() { normal_remote_script; printf '\\nexit 23\\n'; }
+main "$@"'''))
+            local(['bash', str(broken), str(ROOT), '203.0.113.7', '22', ADMIN, str(work / 'admin'),
+                   str(work / 'fetch-known'), 'en4', str(private_output / 'failed-transfer.json')],
+                  'real SSH nonzero after complete payload', expected=1)
+            assert not (private_output / 'failed-transfer.json').exists()
+            passed('real SSH nonzero after valid payload prevents publication and cleans temporary files')
             ssh('sudo -n useradd --create-home --shell /bin/bash fixturedenied; '
                 'sudo -n install -d -m 700 -o fixturedenied -g fixturedenied /home/fixturedenied/.ssh; '
                 'sudo -n install -m 600 -o fixturedenied -g fixturedenied /home/fixtureadmin/.ssh/authorized_keys /home/fixturedenied/.ssh/authorized_keys',
