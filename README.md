@@ -93,14 +93,15 @@ systemctl restart sing-box
 
 按 [最小私密交接](docs/private-handoff.md) 只把客户端必要字段通过已核验身份的私密连接交给 Mac；
 不得下载含 REALITY 私钥的整份服务端配置。再用独立客户端验证 HTTPS。Mac 当前需要使用
-已确认的物理网卡 en4；SSH 的接口绑定不会自动作用于 sing-box。客户端配置须显式设置并验证
-`bind_interface`，且基线关闭 MUX。VPS 本地服务检查不等于公网链路已经通过。
+操作者明确选择的物理网卡（当前网络可能是 en0，而不是 en4）；SSH 的接口绑定不会自动作用于 sing-box。
+这适用于独立诊断客户端；1.14.2 日用 TUN 候选改用自动接口保护，见 [网络切换方案](docs/mac-network-handoff.md)。
+客户端基线关闭 MUX，VPS 本地服务检查不等于公网链路已经通过。
 
 ## Mac 客户端
 
 配套的 `scripts/fetch-vps-config.sh` 通过已核验 SSH 身份只取回 SS2022 最小投影。
 再由独立 `scripts/connect-vps.sh` 私密导入，启动本机 SOCKS5，
-绑定 en4 并验证一次 HTTPS。Apple Silicon Mac；Bash、curl、jq、OpenSSL 和 sing-box
+绑定所选网卡（默认 en4，Wi-Fi 须按实际接口指定）并验证一次 HTTPS。Apple Silicon Mac；Bash、curl、jq、OpenSSL 和 sing-box
 使用 Homebrew 当前稳定版，明确使用 Homebrew 工具路径。无需 sudo 或 Python。
 使用方法与限制见 [Mac 客户端说明](docs/mac-client.md)。
 

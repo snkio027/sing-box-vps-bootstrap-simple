@@ -1,0 +1,49 @@
+{
+  "checked_on": "2026-10-19",
+  "base_revision": "b1dc5637b2819eba92cb3764b6d4bf5a0035aa07",
+  "scope": "Repository Mac 1.14.2 candidate; no live configuration changes",
+  "environment": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "arm64",
+    "python": "3.15.0"
+  },
+  "local_results": [
+    {
+      "command": "python3 -B tests/client_profiles_test.py",
+      "tests": 12,
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -B tests/reality_profiles_test.py",
+      "tests": 6,
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -B tests/check_client_profiles.py --binary /opt/sing-box/1.14.2/sing-box --mode reviewed --output /tmp/mac-interface-check",
+      "profiles": 4,
+      "exit_code": 0
+    }
+  ],
+  "old_profile_negative_control": "Exact b1dc563 Mac profile rejected by current validator",
+  "configuration_diff": "Only five bind_interface=en4 fields removed; other JSON values unchanged",
+  "reviewed_binary_size": 83818578,
+  "reviewed_binary_sha256": "d652879eed7e38b866fa980bc2e119dcdb13968fe5e6583670293a258686d0e7",
+  "source_sha256": {
+    "examples/1.14.2/client-versions.json": "8dd5dfb1e55f9d36455dc1495ec639f274ae962dfbcefa4b8c0b47204a7f4140",
+    "tests/check_client_profiles.py": "b2b953cd6d98d79823e08240879bd1c77652fe29083a46690f8ea6c373bb4cc6",
+    "tests/client_profiles_test.py": "33d62af62075ec7ce22f3c32539be8b497201aa82faff75b2bef2fbd0321d23e",
+    "examples/1.14.2/server.example.json": "4e9fbb44b6b71c9774898d6b5dce227d1fb3d179a85c78ebb09273bae363b3bd",
+    "examples/1.14.2/macos.example.json": "80d4ad95068d3c84ad83139b1a6f498f9a225aa881a43a1f01e609e7644d3a00",
+    "examples/1.14.2/android.example.json": "be91d3a2e7db455dbc654d0c0eb3ed0eac818b4cd846cac8c880fe6dab9eb499",
+    "examples/1.14.2/ios.example.json": "f629a4eb835060e638ba925977fe0069980bfa121588e0e7b3a33892f5651393",
+    "tests/reality_profiles_test.py": "3f040c341a8eb3763575e35ddfa45529243c24b10a8ff9db75feea217d5a6958"
+  },
+  "loopback_attempt": "Not handoff evidence: bound missing interface still reached loopback; core deliberately skips such binding. Test harness not shipped.",
+  "wifi_handoff": "NOT RUN",
+  "dns_upstream_refresh": "NOT RUN",
+  "full_tun": "NOT RUN",
+  "orbstack": "NOT RUN",
+  "real_vps": "NOT RUN",
+  "live_configuration_changes": false
+}

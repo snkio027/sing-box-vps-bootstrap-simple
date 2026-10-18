@@ -46,7 +46,7 @@ X25519 协商、证书覆盖所填 server name 以及所需 ALPN；检查未认�
 服务端 `config.json` 也含私钥，不能整份下载；SS2022 交接改用 [白名单投影](private-handoff.md)。
 
 客户端增加手动 `selector`，默认仍为 `ss2022`；可明确选择 `reality`。DNS、规则下载和既有代理路由
-继续指向 selector 的 `vps` 标签；不设置自动直连回退。Mac 保留 en4；手机保留平台 socket 保护，
+继续指向 selector 的 `vps` 标签；不设置自动直连回退。Mac 日用候选使用自动接口保护，见 [网络切换方案](mac-network-handoff.md)；独立诊断仍选择明确网卡。手机保留平台 socket 保护，
 不硬编码网卡。缓存 ID 保持旧值，避免因为补丁版本变动主动丢弃 FakeIP 映射。
 
 REALITY 的 TLS 外观不是不可识别保证；sing-box 官方提醒 uTLS 的指纹局限。此批不承诺速度提升、

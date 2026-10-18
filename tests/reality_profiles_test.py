@@ -25,15 +25,19 @@ def validate(platform, c):
     assert reality['tls']['enabled'] is True and 'insecure' not in reality['tls']
     assert reality['tls']['utls'] == {'enabled': True, 'fingerprint': 'chrome'}
     assert reality['tls']['reality']['enabled'] is True
+    assert 'bind_interface' not in reality
     if platform == 'macos':
-        assert reality['bind_interface'] == 'en4'
-    else:
-        assert 'bind_interface' not in reality
+        baseline.validate_automatic_interface(c)
     normalized = copy.deepcopy(c)
     normalized['outbounds'] = [copy.deepcopy(ss)] + normalized['outbounds'][3:]
     normalized['outbounds'][0]['tag'] = 'vps'
-    baseline.validate(platform, normalized)
-    assert normalized == baseline.load(platform), 'Protocol addition changed existing policy/cache'
+    baseline.validate(platform, normalized, automatic_interface=(platform == 'macos'))
+    expected = baseline.load(platform)
+    if platform == 'macos':
+        # The 1.14.0 baseline is historical. Only its explicit dialer pins are removed.
+        for obj in baseline.objects(expected):
+            obj.pop('bind_interface', None)
+    assert normalized == expected, 'Unexpected DNS/routing/cache change'
 
 
 class RealityProfilesTests(unittest.TestCase):
@@ -55,6 +59,34 @@ class RealityProfilesTests(unittest.TestCase):
                 mutate(c)
                 with self.assertRaises(AssertionError):
                     validate(platform, c)
+
+    def test_mac_rejects_any_fixed_dialer(self):
+        # Every former pin, plus local-direct, is checked independently. Replacing
+        # en4 with en0 is also rejected: that merely moves the next handoff failure.
+        for section, index in (('dns', 1), ('dns', 2), ('outbounds', 1),
+                               ('outbounds', 2), ('outbounds', 3), ('outbounds', 4)):
+            for field, value in (('bind_interface', 'en4'), ('bind_interface', 'en0'),
+                                 ('inet4_bind_address', '192.0.2.2')):
+                c = load('macos')
+                target = c['dns']['servers'][index] if section == 'dns' else c[section][index]
+                target[field] = value
+                with self.subTest(section=section, index=index, field=field, value=value):
+                    with self.assertRaises(AssertionError):
+                        validate('macos', c)
+
+    def test_mac_rejects_global_pin_or_disabled_protection(self):
+        for field, value in (('default_interface', 'en4'), ('auto_detect_interface', False),
+                             ('default_network_type', ['wifi'])):
+            c = load('macos'); c['route'][field] = value
+            with self.subTest(field=field), self.assertRaises(AssertionError):
+                validate('macos', c)
+
+    def test_old_five_pin_profile_is_rejected(self):
+        c = load('macos')
+        for obj in c['dns']['servers'][1:3] + c['outbounds'][1:4]:
+            obj['bind_interface'] = 'en4'
+        with self.assertRaises(AssertionError):
+            validate('macos', c)
 
     def test_server_client_identity(self):
         server = load('server')

@@ -24,7 +24,16 @@ def objects(value):
             yield from objects(child)
 
 
-def validate(platform, config):
+def validate_automatic_interface(config):
+    forbidden = {'bind_interface', 'inet4_bind_address', 'inet6_bind_address',
+                 'default_interface', 'network_strategy', 'network_type',
+                 'fallback_network_type', 'default_network_strategy',
+                 'default_network_type', 'default_fallback_network_type'}
+    for obj in objects(config):
+        assert not forbidden.intersection(obj)
+
+
+def validate(platform, config, automatic_interface=False):
     """These are project policy checks, not a replacement sing-box JSON parser."""
     assert platform in PLATFORMS
     outbound = {o['tag']: o for o in config['outbounds']}
@@ -66,7 +75,11 @@ def validate(platform, config):
     if platform == 'macos':
         assert config['inbounds'][1] == {
             'type': 'mixed', 'tag': 'mixed-in', 'listen': '127.0.0.1', 'listen_port': 17890}
-        assert vps['bind_interface'] == 'en4' and local_dns['bind_interface'] == 'en4'
+        if automatic_interface:
+            # Daily Mac profile: every dialer inherits the protected dynamic interface.
+            validate_automatic_interface(config)
+        else:
+            assert vps['bind_interface'] == 'en4' and local_dns['bind_interface'] == 'en4'
         assert 'bind_interface' not in outbound['local-direct']
     else:
         assert len(config['inbounds']) == 1

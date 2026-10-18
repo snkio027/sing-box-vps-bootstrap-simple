@@ -37,6 +37,12 @@ The previous controller, schemas and ADRs are historical at commit
   CLI checks do not establish mobile VPN, switching-network or background behavior;
   those require device evidence. This scope does not change connect-vps.sh or deploy
   configurations to the operator's devices automatically.
+- Daily Mac 1.14.2 examples use auto_detect_interface without fixed outbound/DNS
+  interface or source-address pins. Keep local-direct protection and all routing,
+  DNS, credentials and cache policy. Historical 1.14.0 and the deliberately pinned
+  diagnostic/fetch entries stay separate. Do not add a network watcher or restart loop.
+  Native construction checks do not establish Wi-Fi handoff, DNS refresh or TUN recovery;
+  those need explicit later operator tests. Never alter live networking in CI/local tests.
 - Ubuntu 24.04, amd64/arm64; new installs pin sing-box 1.14.2; SS2022 on IPv4 TCP 443.
 - On 2026-09-26 the user selected VLESS + REALITY + Vision and a stable-version upgrade.
   Ship a standalone maintain-vps.sh with separate upgrade (reviewed 1.14.0 -> 1.14.2)

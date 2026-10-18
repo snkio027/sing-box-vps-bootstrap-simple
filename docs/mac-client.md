@@ -48,11 +48,14 @@ chmod 600 "$HOME/vps-private/ss2022.json"
 /opt/homebrew/bin/bash connect-vps.sh setup VPS_IP "$HOME/vps-private/ss2022.json"
 ```
 
-默认绑定之前已确认的物理网卡 `en4`。换网卡时，在 setup 最后明确指定，例如：
+此独立诊断入口有意固定所选网卡，不做运行中切网。默认值仍为早期的 `en4`；它不是 Wi-Fi 的通用名称。
+使用 Wi-Fi 时先核对实际设备（本机为 `en0`），再在 setup 最后明确指定，例如：
 
 ```bash
 /opt/homebrew/bin/bash connect-vps.sh setup VPS_IP "$HOME/vps-private/ss2022.json" en0
 ```
+
+1.14.2 日用 TUN 样例的自动接口方案见 [Mac 网络切换](mac-network-handoff.md)；不要把独立诊断入口当成后台切网控制器。
 
 setup 导入原密钥并用当前 sing-box 检查配置。连接设置保存在
 `~/Library/Application Support/sing-box-vps/client.json`，权限为 600。

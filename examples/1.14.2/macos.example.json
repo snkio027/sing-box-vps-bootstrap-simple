@@ -26,14 +26,12 @@
         "tls": {
           "enabled": true,
           "server_name": "dns.alidns.com"
-        },
-        "bind_interface": "en4"
+        }
       },
       {
         "type": "local",
         "tag": "dns-local",
-        "prefer_go": false,
-        "bind_interface": "en4"
+        "prefer_go": false
       },
       {
         "type": "fakeip",
@@ -166,7 +164,6 @@
       "multiplex": {
         "enabled": false
       },
-      "bind_interface": "en4",
       "connect_timeout": "10s"
     },
     {
@@ -190,13 +187,11 @@
           "short_id": "0123456789abcdef"
         }
       },
-      "connect_timeout": "10s",
-      "bind_interface": "en4"
+      "connect_timeout": "10s"
     },
     {
       "type": "direct",
       "tag": "direct",
-      "bind_interface": "en4",
       "domain_resolver": "dns-direct",
       "connect_timeout": "10s"
     },

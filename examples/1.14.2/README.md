@@ -8,7 +8,9 @@
 
 1.14.0 目录保留历史基线。新目录沿用原 DNS、广告、私网和真实 IP GeoIP 补充策略；
 不支持公网 UDP/ICMP 或完整公网 IPv6，不叠加 Vision 与 MUX，不自动退回直连。
-Mac 保留 en4、规则 initial_path 和回环监听；手机不带固定网卡/额外监听/未提供规则文件。
+Mac 日用候选移除五处 en4 固定绑定，保留 `route.auto_detect_interface=true`、规则 initial_path 和回环监听；
+手机继续不带固定网卡/额外监听/未提供规则文件。候选不自动更新现网，
+原因、DNS 防回环和切网验收见 [Mac 网络切换](../../docs/mac-network-handoff.md)。
 三份规则必须可读或能首次下载；桌面 check 不证明移动 VPN、无缓存启动、切网或锁屏成功。
 
 私密交接时替换两个出站的 VPS 地址和 /32 规则，SS2022 密钥、REALITY UUID/公钥/short ID、
